@@ -1,25 +1,30 @@
 use crate::routes::utils::{get_spotify, see_other};
+use crate::session_state::TypedSession;
 use actix_web::{web, HttpResponse};
-use serde::Deserialize;
 use rspotify::clients::OAuthClient;
+use serde::Deserialize;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct CallbackQuery {
     code: String,
-    state: String
+    state: String, // TODO: use state
 }
 
-pub async fn callback(query: web::Query<CallbackQuery>) -> HttpResponse {
+pub async fn callback(query: web::Query<CallbackQuery>, session: TypedSession) -> HttpResponse {
     let mut spotify = get_spotify();
-    // let res = spotify.request_token(&query.code);
+
     match spotify.request_token(&query.code).await {
         Ok(_) => {
             log::info!("Request user token successful");
-            see_other("/session")
         }
         Err(err) => {
             log::error!("Failed to get user token {:?}", err);
-            see_other("/")
         }
     }
+
+    session.renew();
+    session.insert_user_id(Uuid::new_v4()).ok(); // TODO: handle error
+    session.insert_context("host".to_string()).ok(); // TODO: handle error and make context enum
+    see_other("/")
 }

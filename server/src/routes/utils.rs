@@ -9,6 +9,7 @@ pub fn see_other(location: &str) -> HttpResponse {
 }
 
 pub fn get_spotify() -> AuthCodeSpotify {
+    // TODO: handle errors
     let creds = Credentials::from_env().unwrap();
     let oauth = OAuth::from_env(scopes!("user-read-currently-playing")).unwrap();
     AuthCodeSpotify::new(creds, oauth)

@@ -15,3 +15,4 @@ mv dist/* "${PUBLIC_DIR}"
 cd ${ROOT}/server
 cargo build
 cp target/debug/server ${OUTPUT_DIR}
+cp .env.local ${OUTPUT_DIR}
