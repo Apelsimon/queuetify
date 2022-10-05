@@ -8,19 +8,17 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 pub struct CallbackQuery {
     code: String,
-    state: String, // TODO: use state
+    state: String,
 }
 
 pub async fn callback(query: web::Query<CallbackQuery>, session: TypedSession) -> HttpResponse {
+    let CallbackQuery{code, state: _state} = query.into_inner();
     let mut spotify = get_spotify();
 
-    match spotify.request_token(&query.code).await {
-        Ok(_) => {
-            log::info!("Request user token successful");
-        }
-        Err(err) => {
-            log::error!("Failed to get user token {:?}", err);
-        }
+
+    if let Err(err) = spotify.request_token(&code).await  {
+        log::error!("Failed to get user token {:?}", err);
+        return see_other("/");
     }
 
     session.renew();
