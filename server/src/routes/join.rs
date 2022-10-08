@@ -1,6 +1,6 @@
 use crate::session_state::TypedSession;
-use uuid::Uuid;
 use actix_web::HttpResponse;
+use uuid::Uuid;
 
 use super::utils::see_other;
 

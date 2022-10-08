@@ -1,10 +1,12 @@
 pub mod callback;
-pub mod context;
 pub mod create;
+pub mod index;
 pub mod join;
-mod utils;
+pub mod session;
+pub mod utils;
 
 pub use callback::*;
-pub use context::*;
 pub use create::*;
+pub use index::*;
 pub use join::*;
+pub use session::*;

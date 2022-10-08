@@ -12,11 +12,13 @@ pub struct CallbackQuery {
 }
 
 pub async fn callback(query: web::Query<CallbackQuery>, session: TypedSession) -> HttpResponse {
-    let CallbackQuery{code, state: _state} = query.into_inner();
+    let CallbackQuery {
+        code,
+        state: _state,
+    } = query.into_inner();
     let mut spotify = get_spotify();
 
-
-    if let Err(err) = spotify.request_token(&code).await  {
+    if let Err(err) = spotify.request_token(&code).await {
         log::error!("Failed to get user token {:?}", err);
         return see_other("/");
     }
@@ -24,5 +26,5 @@ pub async fn callback(query: web::Query<CallbackQuery>, session: TypedSession) -
     session.renew();
     session.insert_user_id(Uuid::new_v4()).ok(); // TODO: handle error
     session.insert_context("host".to_string()).ok(); // TODO: handle error and make context enum
-    see_other("/")
+    see_other("/session")
 }

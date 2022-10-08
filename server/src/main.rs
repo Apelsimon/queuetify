@@ -5,7 +5,7 @@ use actix_web::cookie::Key;
 use actix_web::{web, App, HttpServer};
 use dotenv;
 use env_logger::Env;
-use server::routes::{callback, create_session, get_context, join};
+use server::routes::{callback, create_session, index, join, session};
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -24,11 +24,12 @@ async fn main() -> anyhow::Result<()> {
                 redis_store.clone(),
                 secret_key.clone(),
             ))
+            .route("/", web::get().to(index))
             .route("/create", web::get().to(create_session))
             .route("/callback", web::get().to(callback))
             .route("/join", web::get().to(join))
-            .route("/context", web::get().to(get_context))
-            .service(fs::Files::new("/", "./public").index_file("index.html"))
+            .route("/session", web::get().to(session))
+            .service(fs::Files::new("/", "."))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
