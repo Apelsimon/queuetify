@@ -21,7 +21,6 @@ export default defineComponent({
       } catch (error) {
         console.log("Error on create endpoint: ", error);
       }
-      
     }
 
     return { create }
