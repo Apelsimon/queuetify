@@ -17,14 +17,6 @@ pub async fn session(
     typed_session: TypedSession,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    match typed_session.get_user_id() {
-        Ok(None) | Err(_) => {
-            log::info!("Not authed, redirect");
-            return Ok(see_other("/"));
-        }
-        _ => {}
-    }
-
     // TODO: handle error
     let id = typed_session.get_id().unwrap().unwrap();
 

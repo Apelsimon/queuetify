@@ -34,10 +34,7 @@ pub async fn callback(
     let token = spotify.get_token().lock().await.unwrap().clone();
     let token = serde_json::to_string(&token)?;
     let queue_id = Uuid::new_v4();
-    // - create join session entry in postgres with:
-    //     - session id (uuid)
-    //     - deserialized auth token
-    //     - queue id
+    
     sqlx::query!(
         r#"
             INSERT INTO sessions (

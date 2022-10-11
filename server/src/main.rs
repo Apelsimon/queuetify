@@ -9,6 +9,8 @@ use env_logger::Env;
 use server::routes::{callback, create_session, index, join, session};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::PgPool;
+use actix_web_lab::middleware::from_fn;
+use server::middleware::reject_anonymous_users;
 
 pub fn get_connection_pool() -> PgPool {
     let options = PgConnectOptions::new()
@@ -45,7 +47,10 @@ async fn main() -> anyhow::Result<()> {
             .route("/create", web::get().to(create_session))
             .route("/callback", web::get().to(callback))
             .route("/join/{id}", web::get().to(join))
-            .route("/session", web::get().to(session))
+            .service(
+                web::resource("/session").route(web::get().to(session))
+                        .wrap(from_fn(reject_anonymous_users))
+            )
             .service(fs::Files::new("/", "."))
             .app_data(db_pool.clone())
     })
