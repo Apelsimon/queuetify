@@ -7,7 +7,7 @@ const connect = () =>  {
     const { location } = window
 
     const proto = location.protocol.startsWith('https') ? 'wss' : 'ws'
-    const wsUri = `${proto}://${location.host}/ws`
+    const wsUri = `${proto}://${location.host}/session/ws`
 
     console.log('Connecting...')
     socket = new WebSocket(wsUri)

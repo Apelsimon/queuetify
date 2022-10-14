@@ -51,5 +51,5 @@ pub async fn callback(
     .map_err(e500)?;
 
     session.renew(session_id, Host).map_err(e500)?;
-    Ok(see_other("/session"))
+    Ok(see_other("/session/"))
 }

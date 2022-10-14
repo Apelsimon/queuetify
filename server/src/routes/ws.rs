@@ -10,7 +10,8 @@ pub async fn ws_connect(
     session: TypedSession,
     controller: Data<Addr<Controller>>,
 ) -> Result<HttpResponse, Error> {
-    let session_id = session.get_id().unwrap().unwrap(); // TODO: handle error
+    // TODO: Ok to assume id exists here because of protected route?
+    let session_id = session.get_id().unwrap().unwrap();
     let ws = WsConnection::new(session_id, controller.get_ref().clone());
 
     let resp = ws::start(ws, &req, stream)?;

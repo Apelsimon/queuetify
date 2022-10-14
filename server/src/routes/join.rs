@@ -25,5 +25,5 @@ pub async fn join(
     log::info!("Found valid id {}", id);
 
     session.renew(id, Peer).map_err(e500)?;
-    Ok(see_other("/session"))
+    Ok(see_other("/session/"))
 }

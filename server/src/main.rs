@@ -51,13 +51,13 @@ async fn main() -> anyhow::Result<()> {
             .route("/create", web::get().to(create_session))
             .route("/callback", web::get().to(callback))
             .route("/join/{id}", web::get().to(join))
-            .route("/ws", web::get().to(ws_connect))
             .service(
-                web::resource("/session")
-                    .route(web::get().to(session))
-                    .wrap(from_fn(reject_anonymous_users)),
+                web::scope("/session")
+                    .wrap(from_fn(reject_anonymous_users))
+                    .route("/", web::get().to(session))
+                    .route("/ws", web::get().to(ws_connect))
             )
-            .service(fs::Files::new("/", "."))
+            .service(fs::Files::new("/static", "."))
             .app_data(db_pool.clone())
             .app_data(web::Data::new(controller.clone()))
     })
