@@ -28,26 +28,17 @@ impl fmt::Display for Context {
 
 impl TypedSession {
     const ID_KEY: &'static str = "id";
-    const USER_ID_KEY: &'static str = "user_id";
     const CONTEXT_ID_KEY: &'static str = "context_id";
 
-    pub fn renew(&self) {
+    pub fn renew(&self, id: Uuid, ctx: Context) -> Result<(), serde_json::Error> {
         self.0.renew();
+
+        self.0.insert(Self::ID_KEY, id)?;
+        self.0.insert(Self::CONTEXT_ID_KEY, ctx)
     }
-    pub fn insert_id(&self, id: Uuid) -> Result<(), serde_json::Error> {
-        self.0.insert(Self::ID_KEY, id)
-    }
+
     pub fn get_id(&self) -> Result<Option<Uuid>, serde_json::Error> {
         self.0.get(Self::ID_KEY)
-    }
-    pub fn insert_user_id(&self, user_id: Uuid) -> Result<(), serde_json::Error> {
-        self.0.insert(Self::USER_ID_KEY, user_id)
-    }
-    pub fn get_user_id(&self) -> Result<Option<Uuid>, serde_json::Error> {
-        self.0.get(Self::USER_ID_KEY)
-    }
-    pub fn insert_context(&self, ctx: Context) -> Result<(), serde_json::Error> {
-        self.0.insert(Self::CONTEXT_ID_KEY, ctx)
     }
     pub fn get_context(&self) -> Result<Option<Context>, serde_json::Error> {
         self.0.get(Self::CONTEXT_ID_KEY)

@@ -15,7 +15,7 @@ pub async fn reject_anonymous_users(
         TypedSession::from_request(http_request, payload).await
     }?;
 
-    if let Ok(Some(_)) = session.get_id() {
+    if let Ok(Some(_id)) = session.get_id() {
         log::info!("Valid session!");
         return next.call(req).await;
     }

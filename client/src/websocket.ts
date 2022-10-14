@@ -1,4 +1,4 @@
-
+    
 let socket: WebSocket = null;
 
 const connect = () =>  {

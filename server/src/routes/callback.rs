@@ -50,11 +50,6 @@ pub async fn callback(
     .await
     .map_err(e500)?;
 
-    session.renew();
-    // TODO: handle errors
-    session.insert_id(session_id).ok();
-    session.insert_user_id(Uuid::new_v4()).ok();
-    session.insert_context(Host).ok();
-
+    session.renew(session_id, Host).map_err(e500)?;
     Ok(see_other("/session"))
 }

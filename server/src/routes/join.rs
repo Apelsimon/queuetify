@@ -23,10 +23,7 @@ pub async fn join(
     }
 
     log::info!("Found valid id {}", id);
-    // TODO: handle errors
-    session.renew();
-    session.insert_id(id).ok();
-    session.insert_user_id(Uuid::new_v4()).ok();
-    session.insert_context(Peer).ok();
+
+    session.renew(id, Peer).map_err(e500)?;
     Ok(see_other("/session"))
 }
