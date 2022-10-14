@@ -34,7 +34,7 @@ pub async fn callback(
     let token = spotify.get_token().lock().await.unwrap().clone();
     let token = serde_json::to_string(&token)?;
     let queue_id = Uuid::new_v4();
-    
+
     sqlx::query!(
         r#"
             INSERT INTO sessions (

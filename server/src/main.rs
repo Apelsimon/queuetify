@@ -1,16 +1,18 @@
+use actix::Actor;
 use actix_files as fs;
 use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
+use actix_web_lab::middleware::from_fn;
 use dotenv;
 use env_logger::Env;
-use server::routes::{callback, create_session, index, join, session};
+use server::controller::Controller;
+use server::middleware::reject_anonymous_users;
+use server::routes::{callback, create_session, index, join, session, ws_connect};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::PgPool;
-use actix_web_lab::middleware::from_fn;
-use server::middleware::reject_anonymous_users;
 
 pub fn get_connection_pool() -> PgPool {
     let options = PgConnectOptions::new()
@@ -37,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
     let redis_store = RedisSessionStore::new(redis_uri).await?;
     let db_pool = Data::new(get_connection_pool());
 
+    let controller = Controller::default().start();
+
     HttpServer::new(move || {
         App::new()
             .wrap(SessionMiddleware::new(
@@ -47,12 +51,15 @@ async fn main() -> anyhow::Result<()> {
             .route("/create", web::get().to(create_session))
             .route("/callback", web::get().to(callback))
             .route("/join/{id}", web::get().to(join))
+            .route("/ws", web::get().to(ws_connect))
             .service(
-                web::resource("/session").route(web::get().to(session))
-                        .wrap(from_fn(reject_anonymous_users))
+                web::resource("/session")
+                    .route(web::get().to(session))
+                    .wrap(from_fn(reject_anonymous_users)),
             )
             .service(fs::Files::new("/", "."))
             .app_data(db_pool.clone())
+            .app_data(web::Data::new(controller.clone()))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

@@ -1,7 +1,13 @@
+import useWebSocket from "./websocket"
 import "./css/base.css"
 
-const btn = document.querySelector<HTMLButtonElement>("#session-btn")
-btn.addEventListener("click", (ev) => {
+const { connect, send } = useWebSocket()
+
+connect()
+
+const wsPingButton = document.querySelector<HTMLButtonElement>("#ws-ping")
+wsPingButton.addEventListener("click", (ev) => {
     ev.preventDefault()
-    console.log("session-btn clicked!")
+    send("Ping sent from some peer...")
 })
+
