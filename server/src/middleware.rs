@@ -16,8 +16,10 @@ pub async fn reject_anonymous_users(
     }?;
 
     if let Ok(Some(_id)) = session.get_id() {
-        log::info!("Valid session!");
-        return next.call(req).await;
+        if let Ok(Some(_ctx)) = session.get_context() {
+            log::info!("Valid session!");
+            return next.call(req).await;
+        }
     }
 
     log::error!("Invalid session!");

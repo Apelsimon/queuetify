@@ -17,10 +17,9 @@ pub async fn session(
     typed_session: TypedSession,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // TODO: handle error
+    // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
 
-    // TODO: redirect on query miss
     let session = sqlx::query_as!(
         Session,
         r#"
@@ -32,12 +31,12 @@ pub async fn session(
     .await
     .map_err(e500)?;
 
-    let token = serde_json::from_str::<Token>(&session.token).unwrap(); // TODO: handle error
+    let token = serde_json::from_str::<Token>(&session.token).map_err(e500)?;
     let spotify = AuthCodeSpotify::from_token(token);
     let mut render_context = RenderContext::new();
 
     if let Ok(user_info) = spotify.me().await {
-        //TODO: handle error
+        // TODO: Ok to assume context exists here because of protected route?
         let context = typed_session.get_context().unwrap().unwrap();
 
         if context == Context::Host {
