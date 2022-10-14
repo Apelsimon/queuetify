@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
                 web::scope("/session")
                     .wrap(from_fn(reject_anonymous_users))
                     .route("/", web::get().to(session))
-                    .route("/ws", web::get().to(ws_connect))
+                    .route("/ws", web::get().to(ws_connect)),
             )
             .service(fs::Files::new("/static", "."))
             .app_data(db_pool.clone())
