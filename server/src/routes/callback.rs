@@ -4,10 +4,8 @@ use crate::routes::utils::see_other;
 use crate::session_state::{Context::Host, TypedSession};
 use crate::spotify::{get_default_spotify, get_token_string};
 use actix_web::{web, HttpResponse};
-use rspotify::clients::BaseClient;
 use rspotify::clients::OAuthClient;
 use serde::Deserialize;
-use sqlx::PgPool;
 use uuid::Uuid;
 use crate::db::Database;
 

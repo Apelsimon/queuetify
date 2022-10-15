@@ -1,12 +1,8 @@
-use crate::routes::utils::e500;
-use crate::routes::utils::see_other;
+use crate::routes::utils::{e500, see_other};
 use crate::session_state::{Context, TypedSession};
 use crate::templates::TEMPLATES;
-use actix_web::web;
-use actix_web::HttpResponse;
+use actix_web::{web, HttpResponse};
 use rspotify::clients::OAuthClient;
-use rspotify::{AuthCodeSpotify, Token};
-use sqlx::PgPool;
 use tera::Context as RenderContext;
 use crate::spotify::from_token_string;
 use crate::db::Database;
@@ -17,9 +13,7 @@ pub async fn session_index(
 ) -> Result<HttpResponse, actix_web::Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
-
     let session = db.get_session(id).await.map_err(e500)?;
-
     let spotify = from_token_string(&session.token).map_err(e500)?;
     let mut render_context = RenderContext::new();
 
