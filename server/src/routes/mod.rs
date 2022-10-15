@@ -4,7 +4,6 @@ pub mod index;
 pub mod join;
 pub mod session;
 pub mod utils;
-pub mod ws;
 
 pub use callback::*;
 pub use create::*;

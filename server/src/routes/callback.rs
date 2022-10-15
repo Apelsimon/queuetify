@@ -2,13 +2,14 @@ use crate::configuration::SpotifySettings;
 use crate::routes::utils::e500;
 use crate::routes::utils::see_other;
 use crate::session_state::{Context::Host, TypedSession};
-use crate::utils::get_default_spotify;
+use crate::spotify::{get_default_spotify, get_token_string};
 use actix_web::{web, HttpResponse};
 use rspotify::clients::BaseClient;
 use rspotify::clients::OAuthClient;
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
+use crate::db::Database;
 
 #[derive(Deserialize)]
 pub struct CallbackQuery {
@@ -19,7 +20,7 @@ pub struct CallbackQuery {
 pub async fn callback(
     query: web::Query<CallbackQuery>,
     session: TypedSession,
-    pool: web::Data<PgPool>,
+    db: web::Data<Database>,
     settings: web::Data<SpotifySettings>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let CallbackQuery {
@@ -34,24 +35,11 @@ pub async fn callback(
     }
 
     let session_id = Uuid::new_v4();
-    let token = spotify.get_token().lock().await.unwrap().clone();
-    let token = serde_json::to_string(&token)?;
+    let token = get_token_string(&spotify).await?;
     let queue_id = Uuid::new_v4();
 
-    sqlx::query!(
-        r#"
-            INSERT INTO sessions (
-                id, token, queue_id, created_at
-            )
-            VALUES ($1, $2, $3, now())
-        "#,
-        session_id,
-        token,
-        queue_id
-    )
-    .execute(pool.get_ref())
-    .await
-    .map_err(e500)?;
+    db.insert_session(session_id, &token, queue_id).await
+        .map_err(e500)?;
 
     session.renew(session_id, Host).map_err(e500)?;
     Ok(see_other("/session/"))

@@ -7,12 +7,19 @@
 </head>
 <body>
     <h1>Welcome to session page</h1>
+
 {% if context == "host" %}
     <h2>You're hosting the session with alias: {{ display_name }}</h2>
     <p>Session url: http://localhost:8080/join/{{ session_url }}</p>
 {% elif context == "peer" %}
     <h2>You've joined session hosted by: {{ display_name }}</h2>
 {% endif %}
+
+    <div class="search-container">
+        <input id="search-input" type="text" placeholder="Search.." name="search">
+        <button id="search-btn">Search<i class="fa fa-search"></i></button>
+    </div>
+
     <button id="ws-ping">Ping others</button>
     <script src="/static/session.js"></script>
 </body>

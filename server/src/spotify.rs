@@ -2,6 +2,8 @@ use rspotify::{scopes, AuthCodeSpotify, Config, Credentials, OAuth};
 
 use crate::configuration::SpotifySettings;
 use secrecy::ExposeSecret;
+use rspotify::clients::BaseClient;
+use rspotify::Token;
 
 pub fn get_default_spotify(settings: &SpotifySettings) -> AuthCodeSpotify {
     let config = Config::default();
@@ -16,4 +18,14 @@ pub fn get_default_spotify(settings: &SpotifySettings) -> AuthCodeSpotify {
     };
 
     AuthCodeSpotify::with_config(creds, oauth, config)
+}
+
+pub async fn get_token_string(spotify: &AuthCodeSpotify) -> Result<String, serde_json::Error> {
+    let token = spotify.get_token().lock().await.unwrap().clone();
+    serde_json::to_string(&token)
+}
+
+pub fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Error> {
+    let token = serde_json::from_str::<Token>(token)?;
+    Ok(AuthCodeSpotify::from_token(token))
 }

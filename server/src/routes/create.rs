@@ -1,5 +1,5 @@
 use crate::configuration::SpotifySettings;
-use crate::utils::get_default_spotify;
+use crate::spotify::get_default_spotify;
 
 use actix_web::http::header::ContentType;
 use actix_web::web;

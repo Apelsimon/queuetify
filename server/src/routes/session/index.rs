@@ -8,31 +8,19 @@ use rspotify::clients::OAuthClient;
 use rspotify::{AuthCodeSpotify, Token};
 use sqlx::PgPool;
 use tera::Context as RenderContext;
+use crate::spotify::from_token_string;
+use crate::db::Database;
 
-struct Session {
-    pub token: String,
-}
-
-pub async fn session(
+pub async fn session_index(
     typed_session: TypedSession,
-    pool: web::Data<PgPool>,
+    db: web::Data<Database>,
 ) -> Result<HttpResponse, actix_web::Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
 
-    let session = sqlx::query_as!(
-        Session,
-        r#"
-            SELECT token FROM sessions where id = $1
-        "#,
-        id
-    )
-    .fetch_one(pool.get_ref())
-    .await
-    .map_err(e500)?;
+    let session = db.get_session(id).await.map_err(e500)?;
 
-    let token = serde_json::from_str::<Token>(&session.token).map_err(e500)?;
-    let spotify = AuthCodeSpotify::from_token(token);
+    let spotify = from_token_string(&session.token).map_err(e500)?;
     let mut render_context = RenderContext::new();
 
     if let Ok(user_info) = spotify.me().await {
