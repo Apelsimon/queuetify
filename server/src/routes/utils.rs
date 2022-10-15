@@ -1,6 +1,5 @@
 use actix_web::http::header::LOCATION;
 use actix_web::HttpResponse;
-use rspotify::{scopes, AuthCodeSpotify, Config, Credentials, OAuth};
 
 pub fn see_other(location: &str) -> HttpResponse {
     HttpResponse::SeeOther()
@@ -14,15 +13,4 @@ where
     T: std::fmt::Debug + std::fmt::Display + 'static,
 {
     actix_web::error::ErrorInternalServerError(e)
-}
-
-pub fn get_default_spotify() -> Option<AuthCodeSpotify> {
-    let config = Config {
-        token_cached: true,
-        ..Default::default()
-    };
-    let creds = Credentials::from_env()?;
-    let oauth = OAuth::from_env(scopes!("user-read-currently-playing"))?;
-
-    Some(AuthCodeSpotify::with_config(creds, oauth, config))
 }

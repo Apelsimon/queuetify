@@ -1,6 +1,8 @@
+use crate::configuration::SpotifySettings;
 use crate::routes::utils::e500;
-use crate::routes::utils::{get_default_spotify, see_other};
+use crate::routes::utils::see_other;
 use crate::session_state::{Context::Host, TypedSession};
+use crate::utils::get_default_spotify;
 use actix_web::{web, HttpResponse};
 use rspotify::clients::BaseClient;
 use rspotify::clients::OAuthClient;
@@ -18,14 +20,13 @@ pub async fn callback(
     query: web::Query<CallbackQuery>,
     session: TypedSession,
     pool: web::Data<PgPool>,
+    settings: web::Data<SpotifySettings>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let CallbackQuery {
         code,
         state: _state,
     } = query.into_inner();
-    let mut spotify = get_default_spotify().ok_or(actix_web::error::ErrorInternalServerError(
-        "Unable to get default spotify",
-    ))?;
+    let mut spotify = get_default_spotify(&settings);
 
     if let Err(err) = spotify.request_token(&code).await {
         log::error!("Failed to get user token {:?}", err);

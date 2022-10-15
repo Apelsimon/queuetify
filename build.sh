@@ -17,4 +17,5 @@ cd ${ROOT}/server
 cargo build
 cp target/debug/server ${OUTPUT_DIR}
 cp -r templates ${OUTPUT_DIR}
+cp -r configuration ${OUTPUT_DIR}
 cp .env.local ${OUTPUT_DIR}
