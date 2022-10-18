@@ -1,5 +1,6 @@
 use actix_web::web;
 use actix_web::Responder;
+use rspotify::model::SimplifiedArtist;
 use crate::session_state::TypedSession;
 use crate::db::Database;
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,16 @@ pub async fn search(
     Ok(web::Json(search_result))
 }
 
+fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
+    let mut artist_string_vec = Vec::new();
+
+    for artist in artists.iter() {
+        artist_string_vec.push(artist.name.clone());
+    }
+
+    artist_string_vec
+}
+
 async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<SearchResult, ClientError> {
     let mut search_result = SearchResult{
         tracks: Vec::new()
@@ -62,7 +73,7 @@ async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<Se
             
             let track = TrackInfo {
                 name: item.name,
-                artists: Vec::new(), // TODO
+                artists: build_artist_string_vec(&item.artists),
                 id: track_id.to_string()
             };
             search_result.tracks.push(track);
