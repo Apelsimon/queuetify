@@ -1,15 +1,21 @@
+use std::str::FromStr;
+
 use actix_web::web;
 use actix_web::Responder;
+use rspotify::clients::OAuthClient;
 use rspotify::model::SimplifiedArtist;
+use rspotify::model::TrackId;
 use crate::session_state::TypedSession;
 use crate::db::Database;
 use serde::{Deserialize, Serialize};
-use crate::spotify::from_token_string;
+use crate::spotify::get_spotify_from_db;
 use crate::routes::utils::e500;
 use rspotify::model::{SearchType, SearchResult::Tracks};
 use rspotify::clients::BaseClient;
 use rspotify::AuthCodeSpotify;
 use rspotify::ClientError;
+use actix_web::HttpResponse;
+use rspotify::model::enums::misc::Market;
 
 #[derive(Deserialize)]
 pub struct SearchQuery {
@@ -36,11 +42,7 @@ pub async fn search(
     let SearchQuery{input} = query.into_inner();
     log::info!("Search for: {}", input);
 
-    // TODO: Ok to assume id exists here because of protected route?
-    let id = typed_session.get_id().unwrap().unwrap();
-    let session = db.get_session(id).await.map_err(e500)?;
-    let spotify = from_token_string(&session.token).map_err(e500)?;
-
+    let spotify =  get_spotify_from_db(&typed_session, &db).await.map_err(e500)?;
     let search_result = get_search_results(&spotify, &input)
         .await.map_err(e500)?; 
 
@@ -63,7 +65,7 @@ async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<Se
     };
 
     if let Tracks(track_pages) = spotify.search(
-        &input, &SearchType::Track, None, None, Some(10), None)
+        &input, &SearchType::Track, Some(&Market::FromToken), None, Some(10), None)
         .await? {
         for item in track_pages.items {
             let track_id = match item.id {
@@ -81,4 +83,21 @@ async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<Se
     }    
 
     Ok(search_result)
+}
+
+#[derive(serde::Deserialize)]
+pub struct QueueRequest {
+    uri: String,
+}
+
+pub async fn queue(typed_session: TypedSession,
+    db: web::Data<Database>,
+    queue_request: web::Json<QueueRequest>) -> Result<HttpResponse, actix_web::Error> {
+    let queue_request = queue_request.into_inner();
+
+    let track_id = TrackId::from_str(&queue_request.uri).map_err(e500)?;
+    let spotify =  get_spotify_from_db(&typed_session, &db).await.map_err(e500)?;
+
+    spotify.add_item_to_queue(&track_id, None).await.map_err(e500)?;
+    Ok(HttpResponse::Ok().finish())
 }

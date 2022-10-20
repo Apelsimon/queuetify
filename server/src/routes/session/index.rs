@@ -4,7 +4,7 @@ use crate::templates::TEMPLATES;
 use actix_web::{web, HttpResponse};
 use rspotify::clients::OAuthClient;
 use tera::Context as RenderContext;
-use crate::spotify::from_token_string;
+use crate::spotify::get_spotify_from_db;
 use crate::db::Database;
 
 pub async fn session_index(
@@ -13,8 +13,7 @@ pub async fn session_index(
 ) -> Result<HttpResponse, actix_web::Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
-    let session = db.get_session(id).await.map_err(e500)?;
-    let spotify = from_token_string(&session.token).map_err(e500)?;
+    let spotify =  get_spotify_from_db(&typed_session, &db).await.map_err(e500)?;
     let mut render_context = RenderContext::new();
 
     if let Ok(user_info) = spotify.me().await {

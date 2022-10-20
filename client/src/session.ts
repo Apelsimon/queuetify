@@ -23,9 +23,13 @@ const createSearchResultListEntry = (info: TrackInfo) => {
     paragraph.textContent = info.name + " - " + info.artists
     listEntry.appendChild(paragraph)
 
-    const callback = (ev: MouseEvent, trackId: string) => {
+    const callback = async (ev: MouseEvent, trackId: string) => {
         ev.preventDefault()
-        console.log("callback called with id: ", trackId)
+        try {
+            const res = await axios.post("/session/queue", { uri: trackId })
+        } catch (error) {
+            console.log("Error on queue endpoint: ", error)
+        }
     }
     const swap = function (trackId: string, ev: MouseEvent) {
         return this(ev, trackId);

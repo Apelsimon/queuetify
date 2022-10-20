@@ -12,7 +12,7 @@ use server::configuration::{get_configuration};
 use server::controller::Controller;
 use server::middleware::reject_anonymous_users;
 use server::routes::{callback, create_session, index, join, session_index, ws_connect,
-    search};
+    search, queue};
 use server::db::Database;
 
 #[actix_web::main]
@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
                     .route("/", web::get().to(session_index))
                     .route("/ws", web::get().to(ws_connect))
                     .route("/search", web::get().to(search))
+                    .route("/queue", web::post().to(queue))
             )
             .service(fs::Files::new("/static", "."))
             .app_data(db.clone())
