@@ -1,10 +1,20 @@
 import useWebSocket from "./websocket"
-import axios from 'axios'
 import "./css/base.css"
-import { fromJSON } from "postcss"
 
-const { connect, send } = useWebSocket()
-connect()
+const onMessageCb = (ev: MessageEvent<any>) => {
+    let result = JSON.parse(ev.data)
+
+    switch (result.type) {
+        case "SearchResult": {
+            let searchResults = result.payload as SearchResults
+            searchResultsList.textContent = ""
+            searchResultsList.appendChild(createSearchResultList(searchResults))
+        }
+    }
+}
+
+const { doConnect, doSend } = useWebSocket(onMessageCb)
+doConnect()
 
 interface TrackInfo {
     name: string;
@@ -23,13 +33,10 @@ const createSearchResultListEntry = (info: TrackInfo) => {
     paragraph.textContent = info.name + " - " + info.artists
     listEntry.appendChild(paragraph)
 
-    const callback = async (ev: MouseEvent, trackId: string) => {
+    const callback = (ev: MouseEvent, trackId: string) => {
         ev.preventDefault()
-        try {
-            const res = await axios.post("/session/queue", { uri: trackId })
-        } catch (error) {
-            console.log("Error on queue endpoint: ", error)
-        }
+        const queueRequest = { type: "Queue", uri: trackId }
+        doSend(JSON.stringify(queueRequest))
     }
     const swap = function (trackId: string, ev: MouseEvent) {
         return this(ev, trackId);
@@ -56,26 +63,21 @@ const searchResultsList = document.querySelector<HTMLDivElement>("#search-result
 const searchInput = document.querySelector<HTMLInputElement>("#search-input")
 
 const searchButton = document.querySelector<HTMLButtonElement>("#search-btn")
-searchButton.addEventListener("click", async (ev) => {
+searchButton.addEventListener("click", (ev) => {
     ev.preventDefault()
+
+    if (!searchInput.value) return
 
     const input = searchInput.value
     searchInput.value = ""
 
-    try {
-        let result = await axios.get("/session/search?input=".concat(input));
-        let searchResults = result.data as SearchResults
-        searchResultsList.textContent = ""
-        searchResultsList.appendChild(createSearchResultList(searchResults))
-        
-    } catch (error) {
-        console.log("Error on search endpoint: ", error);
-    }
+    const searchRequest = { type: "Search", query: input }
+    doSend(JSON.stringify(searchRequest))
 })
 
 const wsPingButton = document.querySelector<HTMLButtonElement>("#ws-ping")
 wsPingButton.addEventListener("click", (ev) => {
     ev.preventDefault()
-    send("Ping sent from some peer...")
+    doSend("Ping sent from some peer...")
 })
 

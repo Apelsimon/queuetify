@@ -1,8 +1,8 @@
     
 let socket: WebSocket = null;
 
-const connect = () =>  {
-    disconnect()
+const connect = (onMessageCb: (ev: MessageEvent<any>) => any) =>  {
+    doDisconnect()
 
     const { location } = window
 
@@ -16,9 +16,7 @@ const connect = () =>  {
       console.log('Connected')
     }
 
-    socket.onmessage = (ev) => {
-      console.log('Received: ' + ev.data)
-    }
+    socket.onmessage = onMessageCb
 
     socket.onclose = () => {
       console.log('Disconnected')
@@ -26,7 +24,7 @@ const connect = () =>  {
     }
 }
 
-const disconnect = () => {
+const doDisconnect = () => {
     if (socket) {
       console.log('Disconnecting...')
       socket.close()
@@ -34,14 +32,15 @@ const disconnect = () => {
     }
 }
 
-const send = (msg: string) => {
+const doSend = (msg: string) => {
     if (socket) {
         socket.send(msg)
     }
 }
 
-const useWebSocket = () => {
-    return { connect, disconnect, send }
+const useWebSocket = (onMessageCb: (ev: MessageEvent<any>) => any) => {
+  const doConnect = connect.bind(null, onMessageCb)
+  return { doConnect, doDisconnect, doSend }
 }
 
 export default useWebSocket

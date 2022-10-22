@@ -13,7 +13,7 @@ pub async fn session_index(
 ) -> Result<HttpResponse, actix_web::Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
-    let spotify =  get_spotify_from_db(&typed_session, &db).await.map_err(e500)?;
+    let spotify =  get_spotify_from_db(id, &db).await.map_err(e500)?;
     let mut render_context = RenderContext::new();
 
     if let Ok(user_info) = spotify.me().await {

@@ -1,5 +1,5 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage};
+use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage, Search, Queue};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -8,6 +8,8 @@ use actix_web_actors::ws;
 use actix_web_actors::ws::Message::Text;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
+use serde::{Serialize, Deserialize};
+use serde_json;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -79,6 +81,23 @@ impl Actor for WsConnection {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct SearchPayload {
+    query: String
+}
+
+#[derive(Serialize, Deserialize)]
+struct QueuePayload {
+    uri: String
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum Request {
+    Search(SearchPayload),
+    Queue(QueuePayload),
+}
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -98,11 +117,25 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                 ctx.stop();
             }
             Ok(ws::Message::Nop) => (),
-            Ok(Text(s)) => self.controller_addr.do_send(ClientActorMessage {
-                session_id: self.session_id,
-                connection_id: self.connection_id,
-                msg: s.to_string(),
-            }),
+            // Ok(Text(s)) => self.controller_addr.do_send(ClientActorMessage {
+            //     session_id: self.session_id,
+            //     connection_id: self.connection_id,
+            //     msg: s.to_string(),
+            // }),
+            Ok(Text(s)) => {
+                if let Ok(req) = serde_json::from_str(&s.to_string()) {
+                    match req {
+                        Request::Search(s) => { 
+                            self.controller_addr.do_send(Search {
+                                query: s.query,
+                                session_id: self.session_id,
+                                connection_id: self.connection_id
+                            })
+                        },
+                        Request::Queue(q) => { log::info!("Queue uri: {}", q.uri)},
+                    }
+                }
+            },
             Err(e) => panic!("{}", e),
         }
     }
@@ -112,6 +145,8 @@ impl Handler<WsMessage> for WsConnection {
     type Result = ();
 
     fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) {
-        ctx.text(msg.0);
+        if let Ok(data) = serde_json::to_string(&msg.0) {
+            ctx.text(data);
+        }
     }
 }

@@ -1,32 +1,45 @@
-use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage};
+use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage, Queue, Search,
+    SearchComplete};
+use actix::{AsyncContext};
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+use actix_web::{ web};
+use crate::db::Database;
+use crate::spotify::get_spotify_from_db;
+use rspotify::AuthCodeSpotify;
+use serde::{Deserialize, Serialize};
+use rspotify::model::{SearchType, SearchResult::Tracks};
+use rspotify::model::enums::misc::Market;
+use rspotify::clients::BaseClient;
+use rspotify::model::SimplifiedArtist;
+use rspotify::ClientError;
+use crate::controller::messages::{SearchResultPayload, Response};
 
 type Socket = Recipient<WsMessage>;
 
 pub struct Controller {
     clients: HashMap<Uuid, Socket>,
     sessions: HashMap<Uuid, HashSet<Uuid>>,
+    db: web::Data<Database>
 }
 
 // TODO: handle all unwraps
+// TODO: not sure how to handle async in handlers
 
 impl Controller {
-    fn send_message(&self, message: &str, id_to: &Uuid) {
-        if let Some(socket_recipient) = self.clients.get(id_to) {
-            let _ = socket_recipient.do_send(WsMessage(message.to_owned()));
-        } else {
-            log::info!("attempting to send message but couldn't find user id.");
-        }
-    }
-}
-
-impl Default for Controller {
-    fn default() -> Controller {
-        Controller {
+    pub fn new(db: web::Data<Database>) -> Self {
+        Self {
             clients: HashMap::new(),
             sessions: HashMap::new(),
+            db
+        }
+    }
+    fn send_message(&self, message: Response, id_to: &Uuid) {
+        if let Some(socket_recipient) = self.clients.get(id_to) {
+            let _ = socket_recipient.do_send(WsMessage(message));
+        } else {
+            log::info!("attempting to send message but couldn't find user id.");
         }
     }
 }
@@ -40,14 +53,14 @@ impl Handler<Disconnect> for Controller {
 
     fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
         if self.clients.remove(&msg.connection_id).is_some() {
-            self.sessions
-                .get(&msg.session_id)
-                .unwrap()
-                .iter()
-                .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-                .for_each(|user_id| {
-                    self.send_message(&format!("{} disconnected.", &msg.connection_id), user_id)
-                });
+            // self.sessions
+            //     .get(&msg.session_id)
+            //     .unwrap()
+            //     .iter()
+            //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
+            //     .for_each(|user_id| {
+            //         self.send_message(&format!("{} disconnected.", &msg.connection_id), user_id)
+            //     });
             if let Some(session) = self.sessions.get_mut(&msg.session_id) {
                 if session.len() > 1 {
                     session.remove(&msg.connection_id);
@@ -71,23 +84,23 @@ impl Handler<Connect> for Controller {
             .insert(msg.connection_id);
 
         // send to everyone in the room that new uuid just joined
-        self.sessions
-            .get(&msg.session_id)
-            .unwrap()
-            .iter()
-            .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-            .for_each(|conn_id| {
-                self.send_message(&format!("{} just joined!", msg.connection_id), conn_id)
-            });
+        // self.sessions
+        //     .get(&msg.session_id)
+        //     .unwrap()
+        //     .iter()
+        //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
+        //     .for_each(|conn_id| {
+        //         self.send_message(&format!("{} just joined!", msg.connection_id), conn_id)
+        //     });
 
         // store the address
         self.clients.insert(msg.connection_id, msg.client_addr);
 
         // send self your new uuid
-        self.send_message(
-            &format!("your id is {}", msg.connection_id),
-            &msg.connection_id,
-        );
+        // self.send_message(
+        //     &format!("your id is {}", msg.connection_id),
+        //     &msg.connection_id,
+        // );
     }
 }
 
@@ -95,11 +108,108 @@ impl Handler<ClientActorMessage> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: ClientActorMessage, _: &mut Context<Self>) -> Self::Result {
-        self.sessions
-            .get(&msg.session_id)
-            .unwrap()
-            .iter()
-            .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-            .for_each(|client| self.send_message(&msg.msg, client));
+        // self.sessions
+        //     .get(&msg.session_id)
+        //     .unwrap()
+        //     .iter()
+        //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
+        //     .for_each(|client| self.send_message(&msg.msg, client));
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct TrackInfo {
+    name: String,
+    artists: Vec<String>,
+    id: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SearchResult {
+    tracks: Vec<TrackInfo>
+}
+
+fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
+    let mut artist_string_vec = Vec::new();
+
+    for artist in artists.iter() {
+        artist_string_vec.push(artist.name.clone());
+    }
+
+    artist_string_vec
+}
+
+async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<SearchResult, ClientError> {
+    let mut search_result = SearchResult{
+        tracks: Vec::new()
+    };
+
+    if let Tracks(track_pages) = spotify.search(
+        &input, &SearchType::Track, Some(&Market::FromToken), None, Some(10), None)
+        .await? {
+        for item in track_pages.items {
+            let track_id = match item.id {
+                Some(tid) => tid,
+                None => continue,
+            };
+            
+            let track = TrackInfo {
+                name: item.name,
+                artists: build_artist_string_vec(&item.artists),
+                id: track_id.to_string()
+            };
+            search_result.tracks.push(track);
+        }
+    }    
+
+    Ok(search_result)
+}
+
+async fn search(msg: &Search, db: &Database) -> Result<SearchResult, ()> {
+    if let Ok(spotify) =  get_spotify_from_db(msg.session_id, &db).await {
+        if let Ok(search_result) =  get_search_results(&spotify, &msg.query).await{
+            return Ok(search_result);
+        }
+    }
+
+    Err(())
+}
+
+impl Handler<Search> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Search, ctx: &mut Context<Self>) -> Self::Result {
+        log::info!("search for: {}", msg.query);
+        let db = self.db.clone();
+        let addr = ctx.address();
+        actix_web::rt::spawn(async move {
+            if let Ok(search_result) = search(&msg, &db).await {
+                addr.do_send(SearchComplete{
+                    result: search_result,
+                    connection_id: msg.connection_id
+                });
+            }
+        });
+    }
+}
+
+impl Handler<SearchComplete> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: SearchComplete, _ctx: &mut Context<Self>) -> Self::Result {
+        let response = Response::SearchResult(
+            SearchResultPayload{
+                payload: msg.result
+            }
+        );
+        self.send_message(response, &msg.connection_id);
+    }
+}
+
+impl Handler<Queue> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Queue, _: &mut Context<Self>) -> Self::Result {
+        log::info!("queue track: {}", msg.track_id.to_string())
     }
 }
