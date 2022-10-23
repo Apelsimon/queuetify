@@ -10,8 +10,7 @@ use secrecy::ExposeSecret;
 use server::configuration::{get_configuration};
 use server::controller::Controller;
 use server::middleware::reject_anonymous_users;
-use server::routes::{callback, create_session, index, join, session_index, ws_connect,
-    queue};
+use server::routes::{callback, create_session, index, join, session_index, ws_connect};
 use server::db::Database;
 
 #[actix_web::main]
@@ -43,7 +42,6 @@ async fn main() -> anyhow::Result<()> {
                     .wrap(from_fn(reject_anonymous_users))
                     .route("/", web::get().to(session_index))
                     .route("/ws", web::get().to(ws_connect))
-                    .route("/queue", web::post().to(queue))
             )
             .service(fs::Files::new("/static", "."))
             .app_data(db.clone())

@@ -11,7 +11,7 @@ use rspotify::AuthCodeSpotify;
 use serde::{Deserialize, Serialize};
 use rspotify::model::{SearchType, SearchResult::Tracks};
 use rspotify::model::enums::misc::Market;
-use rspotify::clients::BaseClient;
+use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::SimplifiedArtist;
 use rspotify::ClientError;
 use crate::controller::messages::{SearchResultPayload, Response};
@@ -26,6 +26,7 @@ pub struct Controller {
 
 // TODO: handle all unwraps
 // TODO: not sure how to handle async in handlers
+// TODO: add logging for errors
 
 impl Controller {
     pub fn new(db: web::Data<Database>) -> Self {
@@ -210,6 +211,15 @@ impl Handler<Queue> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: Queue, _: &mut Context<Self>) -> Self::Result {
-        log::info!("queue track: {}", msg.track_id.to_string())
+        log::info!("queue track: {}", msg.track_id.to_string());
+        let db = self.db.clone();
+        actix_web::rt::spawn(async move {
+            if let Ok(spotify) =  get_spotify_from_db(msg.session_id, &db).await {
+                match spotify.add_item_to_queue(&msg.track_id, None).await {
+                    Ok(_) => log::info!("item succesfully queued!"),
+                    Err(err) => log::error!("Failed to queue track: {err}")
+                }
+            }
+        });
     }
 }

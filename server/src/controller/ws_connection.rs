@@ -1,5 +1,5 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage, Search, Queue};
+use crate::controller::messages::{Connect, Disconnect, WsMessage, Search, Queue};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use serde_json;
+use rspotify::model::TrackId;
+use std::str::FromStr;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -132,7 +134,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                                 connection_id: self.connection_id
                             })
                         },
-                        Request::Queue(q) => { log::info!("Queue uri: {}", q.uri)},
+                        Request::Queue(q) => { 
+                            if let Ok(track_id) = TrackId::from_str(&q.uri) {
+                                self.controller_addr.do_send(Queue {
+                                    track_id,
+                                    session_id: self.session_id
+                                })
+                            }
+                        },
                     }
                 }
             },
