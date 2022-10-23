@@ -2,6 +2,7 @@ use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMes
     SearchComplete};
 use actix::{AsyncContext};
 use actix::prelude::{Actor, Context, Handler, Recipient};
+use serde::__private::de;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 use actix_web::{ web};
@@ -12,9 +13,11 @@ use serde::{Deserialize, Serialize};
 use rspotify::model::{SearchType, SearchResult::Tracks};
 use rspotify::model::enums::misc::Market;
 use rspotify::clients::{BaseClient, OAuthClient};
-use rspotify::model::SimplifiedArtist;
+use rspotify::model::{SimplifiedArtist, PlayableId};
 use rspotify::ClientError;
 use crate::controller::messages::{SearchResultPayload, Response};
+use rspotify::model::enums::types::DeviceType;
+use rspotify::model::device::Device;
 
 type Socket = Recipient<WsMessage>;
 
@@ -206,6 +209,21 @@ impl Handler<SearchComplete> for Controller {
     }
 }
 
+async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, ()> {
+     match spotify.device().await {
+         Ok(devices) => {
+             for device in devices.into_iter() {
+                 if device._type == DeviceType::Computer {
+                    return Ok(device);
+                 }
+             }
+         },
+         Err(err) => { log::error!("Failed to fetch devices {err}"); }
+     }
+
+    Err(())
+}
+
 // 1. om först i queuen, start playing track (add to db queue)
 // 2. om inte, lägg till i db queue
 // 3. behöver separat tråd som pollar spotify current playing track och ser om det stämmer med db queue
@@ -217,10 +235,36 @@ impl Handler<Queue> for Controller {
         let db = self.db.clone();
         actix_web::rt::spawn(async move {
             if let Ok(spotify) =  get_spotify_from_db(msg.session_id, &db).await {
-                match spotify.add_item_to_queue(&msg.track_id, None).await {
-                    Ok(_) => log::info!("item succesfully queued!"),
-                    Err(err) => log::error!("Failed to queue track: {err}")
+                let session = match db.get_session(msg.session_id).await {
+                    Ok(session) => session,
+                    Err(err) => { log::error!("no session found, {err}"); return; }
+                };
+                // TODO: make device selectable when session is created/started
+                let device = match get_device(&spotify).await {
+                    Ok(device) => device,
+                    Err(()) => { log::error!("Failed to fetch device"); return; }
+                };
+
+                if let Ok((exists, transaction)) = db.has_current_track(session.queue_id).await {
+                    if !exists {
+                        log::info!("No current track exists, start playback of {}", msg.track_id);
+                        let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
+                        match spotify.start_uris_playback(Some(uri.as_ref()), Some(device.id.as_deref().unwrap_or("")), None, None).await {
+                            Ok(_) => { log::info!("Playback of uri started!")},
+                            Err(err) => { log::error!("Playback start error {err}"); return; }
+                        }
+                        
+                        let _ = db.set_current_track(transaction, session.queue_id, msg.track_id).await;
+                    } else {
+                        log::info!("Current track exists, queue track {}", msg.track_id)
+                    }
+                } else {
+                    log::error!("Error checking for current track");
                 }
+                // match spotify.add_item_to_queue(&msg.track_id, None).await {
+                //     Ok(_) => log::info!("item succesfully queued!"),
+                //     Err(err) => log::error!("Failed to queue track: {err}")
+                // }
             }
         });
     }
