@@ -180,7 +180,6 @@ impl Handler<Search> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: Search, ctx: &mut Context<Self>) -> Self::Result {
-        log::info!("search for: {}", msg.query);
         let db = self.db.clone();
         let addr = ctx.address();
         actix_web::rt::spawn(async move {
@@ -207,6 +206,9 @@ impl Handler<SearchComplete> for Controller {
     }
 }
 
+// 1. om först i queuen, start playing track (add to db queue)
+// 2. om inte, lägg till i db queue
+// 3. behöver separat tråd som pollar spotify current playing track och ser om det stämmer med db queue
 impl Handler<Queue> for Controller {
     type Result = ();
 
