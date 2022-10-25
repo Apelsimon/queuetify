@@ -12,7 +12,6 @@ pub struct Database {
 
 pub struct Session {
     pub token: String, // TODO: make secret
-    pub queue_id: Uuid
 }
 
 impl Database {
@@ -30,37 +29,20 @@ impl Database {
         Ok(ok)
     }
 
-    pub async fn new_session(&self, id: Uuid, token: &str,
-        queue_id: Uuid) -> Result<(), sqlx::Error> {
-        let mut transaction = self.pool.begin().await?;
+    pub async fn new_session(&self, id: Uuid, token: &str) -> Result<(), sqlx::Error> {
 
         sqlx::query!(
             r#"
                 INSERT INTO sessions (
-                    id, token, queue_id, created_at
+                    id, token, created_at
                 )
-                VALUES ($1, $2, $3, now())
+                VALUES ($1, $2, now())
             "#,
             id,
-            token,
-            queue_id
+            token
         )
-        .execute(&mut transaction)
+        .execute(&self.pool)
         .await?;
-
-        sqlx::query!(
-            r#"
-                INSERT INTO queues (
-                    id
-                )
-                VALUES ($1)
-            "#,
-            queue_id,
-        )
-        .execute(&mut transaction)
-        .await?;        
-
-        transaction.commit().await?;
 
         Ok(())
     }
@@ -69,7 +51,7 @@ impl Database {
         let session = sqlx::query_as!(
             Session,
             r#"
-                SELECT token, queue_id FROM sessions where id = $1
+                SELECT token FROM sessions where id = $1
             "#,
             id
         )
@@ -81,7 +63,7 @@ impl Database {
     pub async fn has_current_track(&self, id: Uuid) -> Result<(bool, Transaction<'static, Postgres>), sqlx::Error> {
         let mut transaction = self.pool.begin().await?;
 
-        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT current_track_uri FROM queues WHERE id = $1 and current_track_uri is not null)")
+        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT current_track_uri FROM sessions WHERE id = $1 and current_track_uri is not null)")
             .bind(id)
             .fetch_one(&mut transaction)
             .await?;
@@ -92,7 +74,7 @@ impl Database {
     pub async fn set_current_track(&self, mut transaction: Transaction<'static, Postgres>, id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
-                UPDATE queues 
+                UPDATE sessions 
                 SET 
                     current_track_uri = $2
                 WHERE

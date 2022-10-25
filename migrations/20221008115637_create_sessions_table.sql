@@ -2,6 +2,6 @@ CREATE TABLE sessions(
     id uuid NOT NULL,
     PRIMARY KEY (id),
     token TEXT NOT NULL,
-    queue_id uuid NOT NULL UNIQUE,
+    current_track_uri TEXT,
     created_at timestamptz NOT NULL
 );

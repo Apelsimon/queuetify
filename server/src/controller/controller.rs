@@ -245,7 +245,7 @@ impl Handler<Queue> for Controller {
                     Err(()) => { log::error!("Failed to fetch device"); return; }
                 };
 
-                if let Ok((exists, transaction)) = db.has_current_track(session.queue_id).await {
+                if let Ok((exists, transaction)) = db.has_current_track(msg.session_id).await {
                     if !exists {
                         log::info!("No current track exists, start playback of {}", msg.track_id);
                         let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
@@ -254,7 +254,7 @@ impl Handler<Queue> for Controller {
                             Err(err) => { log::error!("Playback start error {err}"); return; }
                         }
                         
-                        let _ = db.set_current_track(transaction, session.queue_id, msg.track_id).await;
+                        let _ = db.set_current_track(transaction, msg.session_id, msg.track_id).await;
                     } else {
                         log::info!("Current track exists, queue track {}", msg.track_id)
                     }

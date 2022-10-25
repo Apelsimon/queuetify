@@ -34,9 +34,8 @@ pub async fn callback(
 
     let session_id = Uuid::new_v4();
     let token = get_token_string(&spotify).await?;
-    let queue_id = Uuid::new_v4();
 
-    db.new_session(session_id, &token, queue_id).await
+    db.new_session(session_id, &token).await
         .map_err(e500)?;
 
     session.renew(session_id, Host).map_err(e500)?;
