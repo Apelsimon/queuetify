@@ -249,14 +249,18 @@ impl Handler<Queue> for Controller {
                     if !exists {
                         log::info!("No current track exists, start playback of {}", msg.track_id);
                         let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
-                        match spotify.start_uris_playback(Some(uri.as_ref()), Some(device.id.as_deref().unwrap_or("")), None, None).await {
-                            Ok(_) => { log::info!("Playback of uri started!")},
-                            Err(err) => { log::error!("Playback start error {err}"); return; }
+                        if let Err(err) = spotify.start_uris_playback(Some(uri.as_ref()), Some(device.id.as_deref().unwrap_or("")), None, None).await {
+                             log::error!("Playback start error {err}"); 
+                             return;
                         }
                         
                         let _ = db.set_current_track(transaction, msg.session_id, msg.track_id).await;
                     } else {
-                        log::info!("Current track exists, queue track {}", msg.track_id)
+                        log::info!("Current track exists, queue track {}", msg.track_id);
+                        if let Err(err) =  db.queue_track(transaction, msg.session_id, msg.track_id).await {
+                            log::error!("Failed to queue track: {}", err);
+                            return;
+                        }
                     }
                 } else {
                     log::error!("Error checking for current track");

@@ -14,6 +14,7 @@ pub struct Session {
     pub token: String, // TODO: make secret
 }
 
+// TODO: take TrackId references instead?
 impl Database {
     pub fn new(settings: &DatabaseSettings) -> Self {
         Self {
@@ -82,6 +83,24 @@ impl Database {
             "#,
             id,
             track_id.to_string()
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        transaction.commit().await?;
+        Ok(())
+    }    
+
+    pub async fn queue_track(&self, mut transaction: Transaction<'static, Postgres>, id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+                INSERT INTO queued_tracks
+                    (track_uri, session_id)
+                VALUES ($1, $2)
+                ON CONFLICT (track_uri, session_id) DO NOTHING
+            "#,
+            track_id.to_string(),
+            id
         )
         .execute(&mut transaction)
         .await?;
