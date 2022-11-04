@@ -13,13 +13,14 @@ async fn main() -> anyhow::Result<()> {
     let db = Database::new(&settings.database);
     let (agent, agent_tx) = SessionAgent::new(db.clone());
     let application = Application::build(settings, agent_tx, db).await?;
-
+    let application_task = tokio::spawn(application.run());
+    let agent_task = tokio::spawn(agent.run());
     // TODO: handle agent run exit and thread join
-    thread::spawn(|| {
-        let _ = agent.run();
-    });
-
-    application.run().await?;
+    
+    tokio::select! {
+        o = application_task => {log::info!("Application task");},
+        o = agent_task =>  { log::info!("Application task"); } 
+    };
 
     Ok(())
 }

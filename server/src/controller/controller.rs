@@ -21,6 +21,7 @@ use std::time::Duration;
 use uuid::Uuid;
 use std::sync::mpsc::Sender;
 use crate::session_agent::SessionAgentRequest;
+use tokio::sync::mpsc::UnboundedSender;
 
 type Socket = Recipient<WsMessage>;
 
@@ -28,7 +29,7 @@ pub struct Controller {
     clients: HashMap<Uuid, Socket>,
     sessions: HashMap<Uuid, HashSet<Uuid>>,
     db: web::Data<Database>,
-    agent_tx: Sender<SessionAgentRequest>
+    agent_tx: UnboundedSender<SessionAgentRequest>
 }
 
 // TODO: handle all unwraps
@@ -36,7 +37,7 @@ pub struct Controller {
 // TODO: add logging for errors
 
 impl Controller {
-    pub fn new(db: web::Data<Database>, agent_tx: Sender<SessionAgentRequest>) -> Self {
+    pub fn new(db: web::Data<Database>, agent_tx: UnboundedSender<SessionAgentRequest>) -> Self {
         Self {
             clients: HashMap::new(),
             sessions: HashMap::new(),
@@ -222,16 +223,20 @@ impl Handler<Search> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: Search, ctx: &mut Context<Self>) -> Self::Result {
-        let db = self.db.clone();
-        let addr = ctx.address();
-        actix_web::rt::spawn(async move {
-            if let Ok(search_result) = search(&msg, &db).await {
-                addr.do_send(SearchComplete {
-                    result: search_result,
-                    connection_id: msg.connection_id,
-                });
-            }
-        });
+        // let db = self.db.clone();
+        // let addr = ctx.address();
+        // actix_web::rt::spawn(async move {
+        //     if let Ok(search_result) = search(&msg, &db).await {
+        //         addr.do_send(SearchComplete {
+        //             result: search_result,
+        //             connection_id: msg.connection_id,
+        //         });
+        //     }
+        // });
+        let request = SessionAgentRequest::Search((msg, ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::Search, {err}");
+        }
     }
 }
 

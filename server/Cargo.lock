@@ -2245,6 +2245,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tera",
+ "tokio",
  "uuid",
 ]
 

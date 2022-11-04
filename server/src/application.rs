@@ -14,13 +14,14 @@ use actix_web_lab::middleware::from_fn;
 use crate::middleware::reject_anonymous_users;
 use std::sync::mpsc::Sender;
 use crate::session_agent::SessionAgentRequest;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Application {
     server: Server
 }
 
 impl Application {
-    pub async fn build(settings: Settings, agent_tx: Sender<SessionAgentRequest>, 
+    pub async fn build(settings: Settings, agent_tx: UnboundedSender<SessionAgentRequest>, 
         db: Database) -> Result<Self, anyhow::Error> {
         let hmac_secret = settings.application.hmac_secret;
         let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
