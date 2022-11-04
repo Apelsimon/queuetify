@@ -1,18 +1,18 @@
-use actix::prelude::{Message, Recipient};
-use uuid::Uuid;
-use rspotify::model::TrackId;
 use crate::controller::SearchResult;
+use actix::prelude::{Message, Recipient};
+use rspotify::model::TrackId;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct SearchResultPayload {
-    pub payload: SearchResult
+    pub payload: SearchResult,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Response {
-    SearchResult(SearchResultPayload)
+    SearchResult(SearchResultPayload),
 }
 
 #[derive(Message)]

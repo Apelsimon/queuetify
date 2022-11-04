@@ -1,17 +1,17 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{Connect, Disconnect, WsMessage, Search, Queue};
+use crate::controller::messages::{Connect, Disconnect, Queue, Search, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
 use actix::{AsyncContext, Handler};
 use actix_web_actors::ws;
 use actix_web_actors::ws::Message::Text;
+use rspotify::model::TrackId;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
-use serde_json;
-use rspotify::model::TrackId;
-use std::str::FromStr;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -85,12 +85,12 @@ impl Actor for WsConnection {
 
 #[derive(Serialize, Deserialize)]
 struct SearchPayload {
-    query: String
+    query: String,
 }
 
 #[derive(Serialize, Deserialize)]
 struct QueuePayload {
-    uri: String
+    uri: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -127,24 +127,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
             Ok(Text(s)) => {
                 if let Ok(req) = serde_json::from_str(&s.to_string()) {
                     match req {
-                        Request::Search(s) => { 
-                            self.controller_addr.do_send(Search {
-                                query: s.query,
-                                session_id: self.session_id,
-                                connection_id: self.connection_id
-                            })
-                        },
-                        Request::Queue(q) => { 
+                        Request::Search(s) => self.controller_addr.do_send(Search {
+                            query: s.query,
+                            session_id: self.session_id,
+                            connection_id: self.connection_id,
+                        }),
+                        Request::Queue(q) => {
                             if let Ok(track_id) = TrackId::from_str(&q.uri) {
                                 self.controller_addr.do_send(Queue {
                                     track_id,
-                                    session_id: self.session_id
+                                    session_id: self.session_id,
                                 })
                             }
-                        },
+                        }
                     }
                 }
-            },
+            }
             Err(e) => panic!("{}", e),
         }
     }

@@ -1,13 +1,14 @@
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use crate::configuration::DatabaseSettings;
-use sqlx::PgPool;
-use secrecy::ExposeSecret;
-use uuid::Uuid;
-use sqlx::{Postgres, Transaction};
 use rspotify::model::TrackId;
+use secrecy::ExposeSecret;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::PgPool;
+use sqlx::{Postgres, Transaction};
+use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct Database {
-    pool: PgPool
+    pool: PgPool,
 }
 
 pub struct Session {
@@ -18,7 +19,7 @@ pub struct Session {
 impl Database {
     pub fn new(settings: &DatabaseSettings) -> Self {
         Self {
-            pool: get_connection_pool(settings)
+            pool: get_connection_pool(settings),
         }
     }
 
@@ -31,7 +32,6 @@ impl Database {
     }
 
     pub async fn new_session(&self, id: Uuid, token: &str) -> Result<(), sqlx::Error> {
-
         sqlx::query!(
             r#"
                 INSERT INTO sessions (
@@ -61,7 +61,10 @@ impl Database {
         Ok(session)
     }
 
-    pub async fn has_current_track(&self, id: Uuid) -> Result<(bool, Transaction<'static, Postgres>), sqlx::Error> {
+    pub async fn has_current_track(
+        &self,
+        id: Uuid,
+    ) -> Result<(bool, Transaction<'static, Postgres>), sqlx::Error> {
         let mut transaction = self.pool.begin().await?;
 
         let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT current_track_uri FROM sessions WHERE id = $1 and current_track_uri is not null)")
@@ -72,7 +75,12 @@ impl Database {
         Ok((exists, transaction))
     }
 
-    pub async fn set_current_track(&self, mut transaction: Transaction<'static, Postgres>, id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
+    pub async fn set_current_track(
+        &self,
+        mut transaction: Transaction<'static, Postgres>,
+        id: Uuid,
+        track_id: TrackId,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
                 UPDATE sessions 
@@ -89,9 +97,14 @@ impl Database {
 
         transaction.commit().await?;
         Ok(())
-    }    
+    }
 
-    pub async fn queue_track(&self, mut transaction: Transaction<'static, Postgres>, id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
+    pub async fn queue_track(
+        &self,
+        mut transaction: Transaction<'static, Postgres>,
+        id: Uuid,
+        track_id: TrackId,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
                 INSERT INTO queued_tracks

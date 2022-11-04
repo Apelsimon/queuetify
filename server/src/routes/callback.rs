@@ -1,4 +1,5 @@
 use crate::configuration::SpotifySettings;
+use crate::db::Database;
 use crate::routes::utils::e500;
 use crate::routes::utils::see_other;
 use crate::session_state::{Context::Host, TypedSession};
@@ -7,7 +8,6 @@ use actix_web::{web, HttpResponse};
 use rspotify::clients::OAuthClient;
 use serde::Deserialize;
 use uuid::Uuid;
-use crate::db::Database;
 
 #[derive(Deserialize)]
 pub struct CallbackQuery {
@@ -35,8 +35,7 @@ pub async fn callback(
     let session_id = Uuid::new_v4();
     let token = get_token_string(&spotify).await?;
 
-    db.new_session(session_id, &token).await
-        .map_err(e500)?;
+    db.new_session(session_id, &token).await.map_err(e500)?;
 
     session.renew(session_id, Host).map_err(e500)?;
     Ok(see_other("/session/"))

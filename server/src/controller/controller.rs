@@ -1,30 +1,34 @@
-use crate::controller::messages::{ClientActorMessage, Connect, Disconnect, WsMessage, Queue, Search,
-    SearchComplete};
-use actix::{AsyncContext};
-use actix::prelude::{Actor, Context, Handler, Recipient};
-use serde::__private::de;
-use std::collections::{HashMap, HashSet};
-use uuid::Uuid;
-use actix_web::{ web};
+use crate::controller::messages::{
+    ClientActorMessage, Connect, Disconnect, Queue, Search, SearchComplete, WsMessage,
+};
+use crate::controller::messages::{Response, SearchResultPayload};
 use crate::db::Database;
 use crate::spotify::get_spotify_from_db;
-use rspotify::AuthCodeSpotify;
-use serde::{Deserialize, Serialize};
-use rspotify::model::{SearchType, SearchResult::Tracks};
-use rspotify::model::enums::misc::Market;
+use actix::prelude::{Actor, Context, Handler, Recipient};
+use actix::AsyncContext;
+use actix_web::web;
 use rspotify::clients::{BaseClient, OAuthClient};
-use rspotify::model::{SimplifiedArtist, PlayableId};
-use rspotify::ClientError;
-use crate::controller::messages::{SearchResultPayload, Response};
-use rspotify::model::enums::types::DeviceType;
 use rspotify::model::device::Device;
+use rspotify::model::enums::misc::Market;
+use rspotify::model::enums::types::DeviceType;
+use rspotify::model::{PlayableId, SimplifiedArtist};
+use rspotify::model::{SearchResult::Tracks, SearchType};
+use rspotify::AuthCodeSpotify;
+use rspotify::ClientError;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+use uuid::Uuid;
+use std::sync::mpsc::Sender;
+use crate::session_agent::SessionAgentRequest;
 
 type Socket = Recipient<WsMessage>;
 
 pub struct Controller {
     clients: HashMap<Uuid, Socket>,
     sessions: HashMap<Uuid, HashSet<Uuid>>,
-    db: web::Data<Database>
+    db: web::Data<Database>,
+    agent_tx: Sender<SessionAgentRequest>
 }
 
 // TODO: handle all unwraps
@@ -32,11 +36,12 @@ pub struct Controller {
 // TODO: add logging for errors
 
 impl Controller {
-    pub fn new(db: web::Data<Database>) -> Self {
+    pub fn new(db: web::Data<Database>, agent_tx: Sender<SessionAgentRequest>) -> Self {
         Self {
             clients: HashMap::new(),
             sessions: HashMap::new(),
-            db
+            db,
+            agent_tx
         }
     }
     fn send_message(&self, message: Response, id_to: &Uuid) {
@@ -48,8 +53,33 @@ impl Controller {
     }
 }
 
+const VERIFY_QUEUE_STATE_INTERVAL: Duration = Duration::from_secs(5);
+
+// queue state poller:
+// - iterate over sessions
+// - if current playing track in spotify is not current_track_uri or non is playing
+// -- play current_track_uri
+// - if current playing track has less than 3s left in spotify:
+// -- add first in queue to spotify queue, if successful remove from db queue, and replace current_track_uri with first one in queue
+
 impl Actor for Controller {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.run_interval(VERIFY_QUEUE_STATE_INTERVAL, |actor, ctx| {
+            for (session_id, _) in actor.sessions.iter() {
+                log::info!("verify queues state for {session_id}");
+                // // actix_web::rt::spawn(async move {
+                // //     log::info!("verify queues state for {id}");
+                // // });
+                // if let Ok(rt) = actix_web::rt::Runtime::new() {
+                //     rt.block_on(async_fn(*session_id))
+                // }
+                // failes with: "thread 'main' panicked at 'Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks.', /home/apelsimon/.cargo/registry/src/github.com-1ecc6299db9ec823/tokio-1.21.2/src/runtime/scheduler/current_thread.rs:516:26
+                // note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+            }
+        });
+    }
 }
 
 impl Handler<Disconnect> for Controller {
@@ -125,12 +155,12 @@ impl Handler<ClientActorMessage> for Controller {
 struct TrackInfo {
     name: String,
     artists: Vec<String>,
-    id: String
+    id: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SearchResult {
-    tracks: Vec<TrackInfo>
+    tracks: Vec<TrackInfo>,
 }
 
 fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
@@ -143,35 +173,44 @@ fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
     artist_string_vec
 }
 
-async fn get_search_results(spotify: &AuthCodeSpotify, input: &str) -> Result<SearchResult, ClientError> {
-    let mut search_result = SearchResult{
-        tracks: Vec::new()
-    };
+async fn get_search_results(
+    spotify: &AuthCodeSpotify,
+    input: &str,
+) -> Result<SearchResult, ClientError> {
+    let mut search_result = SearchResult { tracks: Vec::new() };
 
-    if let Tracks(track_pages) = spotify.search(
-        &input, &SearchType::Track, Some(&Market::FromToken), None, Some(10), None)
-        .await? {
+    if let Tracks(track_pages) = spotify
+        .search(
+            &input,
+            &SearchType::Track,
+            Some(&Market::FromToken),
+            None,
+            Some(10),
+            None,
+        )
+        .await?
+    {
         for item in track_pages.items {
             let track_id = match item.id {
                 Some(tid) => tid,
                 None => continue,
             };
-            
+
             let track = TrackInfo {
                 name: item.name,
                 artists: build_artist_string_vec(&item.artists),
-                id: track_id.to_string()
+                id: track_id.to_string(),
             };
             search_result.tracks.push(track);
         }
-    }    
+    }
 
     Ok(search_result)
 }
 
 async fn search(msg: &Search, db: &Database) -> Result<SearchResult, ()> {
-    if let Ok(spotify) =  get_spotify_from_db(msg.session_id, &db).await {
-        if let Ok(search_result) =  get_search_results(&spotify, &msg.query).await{
+    if let Ok(spotify) = get_spotify_from_db(msg.session_id, &db).await {
+        if let Ok(search_result) = get_search_results(&spotify, &msg.query).await {
             return Ok(search_result);
         }
     }
@@ -187,9 +226,9 @@ impl Handler<Search> for Controller {
         let addr = ctx.address();
         actix_web::rt::spawn(async move {
             if let Ok(search_result) = search(&msg, &db).await {
-                addr.do_send(SearchComplete{
+                addr.do_send(SearchComplete {
                     result: search_result,
-                    connection_id: msg.connection_id
+                    connection_id: msg.connection_id,
                 });
             }
         });
@@ -200,26 +239,26 @@ impl Handler<SearchComplete> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: SearchComplete, _ctx: &mut Context<Self>) -> Self::Result {
-        let response = Response::SearchResult(
-            SearchResultPayload{
-                payload: msg.result
-            }
-        );
+        let response = Response::SearchResult(SearchResultPayload {
+            payload: msg.result,
+        });
         self.send_message(response, &msg.connection_id);
     }
 }
 
 async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, ()> {
-     match spotify.device().await {
-         Ok(devices) => {
-             for device in devices.into_iter() {
-                 if device._type == DeviceType::Computer {
+    match spotify.device().await {
+        Ok(devices) => {
+            for device in devices.into_iter() {
+                if device._type == DeviceType::Computer {
                     return Ok(device);
-                 }
-             }
-         },
-         Err(err) => { log::error!("Failed to fetch devices {err}"); }
-     }
+                }
+            }
+        }
+        Err(err) => {
+            log::error!("Failed to fetch devices {err}");
+        }
+    }
 
     Err(())
 }
@@ -234,30 +273,52 @@ impl Handler<Queue> for Controller {
         log::info!("queue track: {}", msg.track_id.to_string());
         let db = self.db.clone();
         actix_web::rt::spawn(async move {
-            if let Ok(spotify) =  get_spotify_from_db(msg.session_id, &db).await {
+            if let Ok(spotify) = get_spotify_from_db(msg.session_id, &db).await {
                 let session = match db.get_session(msg.session_id).await {
                     Ok(session) => session,
-                    Err(err) => { log::error!("no session found, {err}"); return; }
+                    Err(err) => {
+                        log::error!("no session found, {err}");
+                        return;
+                    }
                 };
                 // TODO: make device selectable when session is created/started
                 let device = match get_device(&spotify).await {
                     Ok(device) => device,
-                    Err(()) => { log::error!("Failed to fetch device"); return; }
+                    Err(()) => {
+                        log::error!("Failed to fetch device");
+                        return;
+                    }
                 };
 
                 if let Ok((exists, transaction)) = db.has_current_track(msg.session_id).await {
                     if !exists {
-                        log::info!("No current track exists, start playback of {}", msg.track_id);
+                        log::info!(
+                            "No current track exists, start playback of {}",
+                            msg.track_id
+                        );
                         let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
-                        if let Err(err) = spotify.start_uris_playback(Some(uri.as_ref()), Some(device.id.as_deref().unwrap_or("")), None, None).await {
-                             log::error!("Playback start error {err}"); 
-                             return;
+                        if let Err(err) = spotify
+                            .start_uris_playback(
+                                Some(uri.as_ref()),
+                                Some(device.id.as_deref().unwrap_or("")),
+                                None,
+                                None,
+                            )
+                            .await
+                        {
+                            log::error!("Playback start error {err}");
+                            return;
                         }
-                        
-                        let _ = db.set_current_track(transaction, msg.session_id, msg.track_id).await;
+
+                        let _ = db
+                            .set_current_track(transaction, msg.session_id, msg.track_id)
+                            .await;
                     } else {
                         log::info!("Current track exists, queue track {}", msg.track_id);
-                        if let Err(err) =  db.queue_track(transaction, msg.session_id, msg.track_id).await {
+                        if let Err(err) = db
+                            .queue_track(transaction, msg.session_id, msg.track_id)
+                            .await
+                        {
                             log::error!("Failed to queue track: {}", err);
                             return;
                         }

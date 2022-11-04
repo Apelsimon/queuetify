@@ -1,8 +1,8 @@
 use super::utils::{e500, see_other};
+use crate::db::Database;
 use crate::session_state::{Context::Peer, TypedSession};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
-use crate::db::Database;
 
 pub async fn join(
     path: web::Path<Uuid>,
@@ -15,7 +15,7 @@ pub async fn join(
         Ok(false) | Err(_) => {
             log::error!("No session found with id {}", id);
             return Ok(see_other("/"));
-        },
+        }
         _ => {}
     }
 
