@@ -9,17 +9,21 @@ use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::device::Device;
 use rspotify::model::enums::misc::Market;
 use rspotify::model::enums::types::DeviceType;
-use rspotify::model::{PlayableId, SimplifiedArtist};
+use rspotify::model::TrackId;
+use rspotify::model::{AdditionalType, PlayableId, PlayableItem, SimplifiedArtist};
 use rspotify::model::{SearchResult::Tracks, SearchType};
 use rspotify::AuthCodeSpotify;
 use rspotify::ClientError;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use uuid::Uuid;
 
 pub enum SessionAgentRequest {
     Search((controller::Search, Addr<Controller>)),
     Queue(controller::Queue),
+    UpdateState(Uuid),
 }
 
 pub struct SessionAgent {
@@ -55,7 +59,12 @@ impl SessionAgent {
                 }
                 SessionAgentRequest::Queue(msg) => {
                     if let Err(err) = on_queue(msg, &self.db).await {
-                        log::error!("On queue error {err}");
+                        log::error!("Error on queue {err}");
+                    }
+                }
+                SessionAgentRequest::UpdateState(id) => {
+                    if let Err(err) = on_update_state(id, &self.db).await {
+                        log::error!("Error on update state {err}");
                     }
                 }
             }
@@ -147,30 +156,115 @@ async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, anyhow::Error> 
     Err(anyhow::Error::msg("No computer device found"))
 }
 
+async fn start_playback(spotify: &AuthCodeSpotify, id: TrackId) -> Result<(), anyhow::Error> {
+    // TODO: make device selectable when session is created/started
+    let device = get_device(&spotify).await?;
+    let uri: Box<dyn PlayableId> = Box::new(id);
+    spotify
+        .start_uris_playback(
+            Some(uri.as_ref()),
+            Some(device.id.as_deref().unwrap_or("")),
+            None,
+            None,
+        )
+        .await?;
+    Ok(())
+}
+
 async fn on_queue(msg: controller::Queue, db: &Database) -> Result<(), anyhow::Error> {
     let spotify = get_spotify_from_db(msg.session_id, &db).await?;
 
-    // TODO: make device selectable when session is created/started
-    let device = get_device(&spotify).await?;
+    let (track, transaction) = db.get_current_track(msg.session_id).await?;
+    match track {
+        Some(_) => {
+            db.queue_track(transaction, msg.session_id, msg.track_id)
+                .await?;
+        }
+        None => {
+            let _ = start_playback(&spotify, msg.track_id.clone()).await?;
+            let _ = db
+                .set_current_track(transaction, msg.session_id, Some(msg.track_id))
+                .await?;
+        }
+    }
 
-    let (exists, transaction) = db.has_current_track(msg.session_id).await?;
-    if !exists {
-        let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
-        spotify
-            .start_uris_playback(
-                Some(uri.as_ref()),
-                Some(device.id.as_deref().unwrap_or("")),
-                None,
-                None,
-            )
-            .await?;
+    Ok(())
+}
 
-        let _ = db
-            .set_current_track(transaction, msg.session_id, msg.track_id)
-            .await?;
-    } else {
-        db.queue_track(transaction, msg.session_id, msg.track_id)
-            .await?;
+pub const UPDATE_STATE_INTERVAL: Duration = Duration::from_secs(5);
+
+async fn on_update_state(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
+    log::info!("update state for {id}");
+    let spotify = get_spotify_from_db(id, &db).await?;
+    let (track, mut transaction) = db.get_current_track(id).await?;
+    match track {
+        Some(expected_playing_id) => {
+            match spotify.current_playing(None, None::<Vec<&AdditionalType>>).await? {
+                Some(current_playing_context) => match current_playing_context.item {
+                    Some(PlayableItem::Track(track)) => {
+                        if let Some(actual_playing_id) = track.id {
+                            if actual_playing_id != expected_playing_id {
+                                let _ = start_playback(&spotify, expected_playing_id).await?;
+                            } else {
+                                if current_playing_context.is_playing {
+                                    match current_playing_context.progress {
+                                        Some(duration) => {
+                                            if (track.duration - duration) < UPDATE_STATE_INTERVAL
+                                            {
+                                                match db
+                                                    .pop_track_from_queue(id, &mut transaction)
+                                                    .await?
+                                                {
+                                                    Some(new_track) => {
+                                                        db
+                                                            .set_current_track(
+                                                                transaction,
+                                                                id,
+                                                                Some(new_track.clone()),
+                                                            )
+                                                            .await?;
+                                                        spotify
+                                                            .add_item_to_queue(&new_track, None)
+                                                            .await?
+                                                    }
+                                                    None => {
+                                                        db.set_current_track(transaction, id, None)
+                                                            .await?;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        None => {
+                                            log::error!("Progress missing for current playing context!");
+                                            todo!();
+                                        }
+                                    }
+                                } else {
+                                    spotify.resume_playback(None, None).await?;
+                                }
+                            }
+                        } else {
+                            log::error!("Track id missing for actual currently playing track!");
+                            todo!();
+                        }
+                    }
+                    Some(PlayableItem::Episode(_)) => {
+                        log::error!("Actual current playing is episode");
+                        todo!()
+                    }
+                    None => {
+                        log::error!("Actual current playing item is none");
+                        todo!();
+                    }
+                },
+                None => {
+                    start_playback(&spotify, expected_playing_id).await?;
+                }
+            }
+        }
+        None => {
+            log::info!("No current track"); // TODO: check queue?
+        }
     }
 
     Ok(())

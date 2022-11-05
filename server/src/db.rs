@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::configuration::DatabaseSettings;
 use rspotify::model::TrackId;
 use secrecy::ExposeSecret;
@@ -13,6 +15,7 @@ pub struct Database {
 
 pub struct Session {
     pub token: String, // TODO: make secret
+    pub current_track_uri: Option<String>,
 }
 
 // TODO: take TrackId references instead?
@@ -48,39 +51,60 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_session(&self, id: Uuid) -> Result<Session, sqlx::Error> {
+    async fn get_session_impl(
+        &self,
+        transaction: &mut Transaction<'static, Postgres>,
+        id: Uuid,
+    ) -> Result<Session, sqlx::Error> {
         let session = sqlx::query_as!(
             Session,
             r#"
-                SELECT token FROM sessions where id = $1
+                SELECT token, current_track_uri FROM sessions where id = $1
             "#,
             id
         )
-        .fetch_one(&self.pool)
+        .fetch_one(transaction)
         .await?;
         Ok(session)
     }
 
-    pub async fn has_current_track(
+    pub async fn get_session(&self, id: Uuid) -> Result<Session, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let session = self.get_session_impl(&mut transaction, id).await?;
+        transaction.commit().await?;
+        Ok(session)
+    }
+
+    pub async fn get_current_track(
         &self,
         id: Uuid,
-    ) -> Result<(bool, Transaction<'static, Postgres>), sqlx::Error> {
+    ) -> Result<(Option<TrackId>, Transaction<'static, Postgres>), sqlx::Error> {
         let mut transaction = self.pool.begin().await?;
+        let session = self.get_session_impl(&mut transaction, id).await?;
 
-        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT current_track_uri FROM sessions WHERE id = $1 and current_track_uri is not null)")
-            .bind(id)
-            .fetch_one(&mut transaction)
-            .await?;
+        let track_id: Option<TrackId> = match session.current_track_uri {
+            Some(current_track_uri) => {
+                match TrackId::from_str(&current_track_uri) {
+                    Ok(id) => Some(id),
+                    Err(_) => None, //TODO: handle invalid stored uri
+                }
+            }
+            None => None,
+        };
 
-        Ok((exists, transaction))
+        Ok((track_id, transaction))
     }
 
     pub async fn set_current_track(
         &self,
         mut transaction: Transaction<'static, Postgres>,
         id: Uuid,
-        track_id: TrackId,
+        track_id: Option<TrackId>,
     ) -> Result<(), sqlx::Error> {
+        let track_id = match track_id {
+            Some(id) => Some(id.to_string()),
+            None => None,
+        };
         sqlx::query!(
             r#"
                 UPDATE sessions 
@@ -90,7 +114,7 @@ impl Database {
                     id = $1
             "#,
             id,
-            track_id.to_string()
+            track_id
         )
         .execute(&mut transaction)
         .await?;
@@ -120,6 +144,34 @@ impl Database {
 
         transaction.commit().await?;
         Ok(())
+    }
+
+    pub async fn pop_track_from_queue(
+        &self,
+        id: Uuid,
+        transaction: &mut Transaction<'static, Postgres>,
+    ) -> Result<Option<TrackId>, sqlx::Error> {
+        let result: Option<(String,)> = sqlx::query_as(
+            r#"
+                DELETE FROM queued_tracks 
+                WHERE track_uri = any (array(SELECT track_uri FROM queued_tracks WHERE session_id = $1 ORDER BY votes DESC LIMIT 1)) RETURNING track_uri;
+            "#
+        )
+        .bind(id)
+        .fetch_optional(transaction)
+        .await?;
+
+        let track_id: Option<TrackId> = match result {
+            Some((track_uri,)) => {
+                match TrackId::from_str(&track_uri) {
+                    Ok(id) => Some(id),
+                    Err(_) => None, //TODO: handle invalid stored uri
+                }
+            }
+            None => None,
+        };
+
+        Ok(track_id)
     }
 }
 

@@ -2,13 +2,10 @@ use crate::controller::messages::{
     ClientActorMessage, Connect, Disconnect, Queue, Search, SearchComplete, WsMessage,
 };
 use crate::controller::messages::{Response, SearchResultPayload};
-use crate::db::Database;
-use crate::session_agent::SessionAgentRequest;
+use crate::session_agent::{SessionAgentRequest, UPDATE_STATE_INTERVAL};
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::AsyncContext;
-use actix_web::web;
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
@@ -21,7 +18,6 @@ pub struct Controller {
 }
 
 // TODO: handle all unwraps
-// TODO: not sure how to handle async in handlers
 // TODO: add logging for errors
 
 impl Controller {
@@ -41,8 +37,6 @@ impl Controller {
     }
 }
 
-const VERIFY_QUEUE_STATE_INTERVAL: Duration = Duration::from_secs(5);
-
 // queue state poller:
 // - iterate over sessions
 // - if current playing track in spotify is not current_track_uri or non is playing
@@ -54,17 +48,12 @@ impl Actor for Controller {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(VERIFY_QUEUE_STATE_INTERVAL, |actor, ctx| {
+        ctx.run_interval(UPDATE_STATE_INTERVAL, |actor, ctx| {
             for (session_id, _) in actor.sessions.iter() {
-                log::info!("verify queues state for {session_id}");
-                // // actix_web::rt::spawn(async move {
-                // //     log::info!("verify queues state for {id}");
-                // // });
-                // if let Ok(rt) = actix_web::rt::Runtime::new() {
-                //     rt.block_on(async_fn(*session_id))
-                // }
-                // failes with: "thread 'main' panicked at 'Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks.', /home/apelsimon/.cargo/registry/src/github.com-1ecc6299db9ec823/tokio-1.21.2/src/runtime/scheduler/current_thread.rs:516:26
-                // note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+                let request = SessionAgentRequest::UpdateState(*session_id);
+                if let Err(err) = actor.agent_tx.send(request) {
+                    log::error!("Failed to send SessionAgentRequest::UpdateState, {err}");
+                }
             }
         });
     }
