@@ -46,7 +46,7 @@ impl SessionAgent {
 
             match request {
                 SessionAgentRequest::Search((msg, addr)) => {
-                    if let Ok(search_result) = search(&msg, &self.db).await {
+                    if let Ok(search_result) = on_search(&msg, &self.db).await {
                         addr.do_send(SearchComplete {
                             result: search_result,
                             connection_id: msg.connection_id,
@@ -54,7 +54,9 @@ impl SessionAgent {
                     }
                 }
                 SessionAgentRequest::Queue(msg) => {
-                    on_queue(msg, &self.db).await;
+                    if let Err(err) = on_queue(msg, &self.db).await {
+                        log::error!("On queue error {err}");
+                    }
                 }
             }
         }
@@ -118,7 +120,7 @@ async fn get_search_results(
     Ok(search_result)
 }
 
-async fn search(msg: &controller::Search, db: &Database) -> Result<SearchResult, ()> {
+async fn on_search(msg: &controller::Search, db: &Database) -> Result<SearchResult, ()> {
     if let Ok(spotify) = get_spotify_from_db(msg.session_id, &db).await {
         if let Ok(search_result) = get_search_results(&spotify, &msg.query).await {
             return Ok(search_result);
@@ -128,7 +130,7 @@ async fn search(msg: &controller::Search, db: &Database) -> Result<SearchResult,
     Err(())
 }
 
-async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, ()> {
+async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, anyhow::Error> {
     match spotify.device().await {
         Ok(devices) => {
             for device in devices.into_iter() {
@@ -142,65 +144,34 @@ async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, ()> {
         }
     }
 
-    Err(())
+    Err(anyhow::Error::msg("No computer device found"))
 }
 
-// 1. om först i queuen, start playing track (add to db queue)
-// 2. om inte, lägg till i db queue
-// 3. behöver separat tråd som pollar spotify current playing track och ser om det stämmer med db queue
-async fn on_queue(msg: controller::Queue, db: &Database) {
-    if let Ok(spotify) = get_spotify_from_db(msg.session_id, &db).await {
-        let session = match db.get_session(msg.session_id).await {
-            Ok(session) => session,
-            Err(err) => {
-                log::error!("no session found, {err}");
-                return;
-            }
-        };
-        // TODO: make device selectable when session is created/started
-        let device = match get_device(&spotify).await {
-            Ok(device) => device,
-            Err(()) => {
-                log::error!("Failed to fetch device");
-                return;
-            }
-        };
+async fn on_queue(msg: controller::Queue, db: &Database) -> Result<(), anyhow::Error> {
+    let spotify = get_spotify_from_db(msg.session_id, &db).await?;
 
-        if let Ok((exists, transaction)) = db.has_current_track(msg.session_id).await {
-            if !exists {
-                log::info!(
-                    "No current track exists, start playback of {}",
-                    msg.track_id
-                );
-                let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
-                if let Err(err) = spotify
-                    .start_uris_playback(
-                        Some(uri.as_ref()),
-                        Some(device.id.as_deref().unwrap_or("")),
-                        None,
-                        None,
-                    )
-                    .await
-                {
-                    log::error!("Playback start error {err}");
-                    return;
-                }
+    // TODO: make device selectable when session is created/started
+    let device = get_device(&spotify).await?;
 
-                let _ = db
-                    .set_current_track(transaction, msg.session_id, msg.track_id)
-                    .await;
-            } else {
-                log::info!("Current track exists, queue track {}", msg.track_id);
-                if let Err(err) = db
-                    .queue_track(transaction, msg.session_id, msg.track_id)
-                    .await
-                {
-                    log::error!("Failed to queue track: {}", err);
-                    return;
-                }
-            }
-        } else {
-            log::error!("Error checking for current track");
-        }
+    let (exists, transaction) = db.has_current_track(msg.session_id).await?;
+    if !exists {
+        let uri: Box<dyn PlayableId> = Box::new(msg.track_id.clone());
+        spotify
+            .start_uris_playback(
+                Some(uri.as_ref()),
+                Some(device.id.as_deref().unwrap_or("")),
+                None,
+                None,
+            )
+            .await?;
+
+        let _ = db
+            .set_current_track(transaction, msg.session_id, msg.track_id)
+            .await?;
+    } else {
+        db.queue_track(transaction, msg.session_id, msg.track_id)
+            .await?;
     }
+
+    Ok(())
 }

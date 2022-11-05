@@ -13,7 +13,6 @@ use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
 use actix_web_lab::middleware::from_fn;
 use secrecy::ExposeSecret;
-use std::sync::mpsc::Sender;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Application {
@@ -29,7 +28,7 @@ impl Application {
         let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
         let redis_store = RedisSessionStore::new(settings.redis_uri.expose_secret()).await?;
         let db = web::Data::new(Database::new(&settings.database));
-        let controller = Controller::new(db.clone(), agent_tx).start();
+        let controller = Controller::new(agent_tx).start();
         let address = format!("127.0.0.1:{}", settings.application.port);
 
         let server = HttpServer::new(move || {

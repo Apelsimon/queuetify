@@ -17,7 +17,6 @@ type Socket = Recipient<WsMessage>;
 pub struct Controller {
     clients: HashMap<Uuid, Socket>,
     sessions: HashMap<Uuid, HashSet<Uuid>>,
-    db: web::Data<Database>,
     agent_tx: UnboundedSender<SessionAgentRequest>,
 }
 
@@ -26,11 +25,10 @@ pub struct Controller {
 // TODO: add logging for errors
 
 impl Controller {
-    pub fn new(db: web::Data<Database>, agent_tx: UnboundedSender<SessionAgentRequest>) -> Self {
+    pub fn new(agent_tx: UnboundedSender<SessionAgentRequest>) -> Self {
         Self {
             clients: HashMap::new(),
             sessions: HashMap::new(),
-            db,
             agent_tx,
         }
     }

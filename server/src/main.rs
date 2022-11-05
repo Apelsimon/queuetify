@@ -1,8 +1,6 @@
-use actix_web::web;
 use env_logger::Env;
 use server::application::Application;
 use server::configuration::get_configuration;
-use server::db::Database;
 use server::session_agent::SessionAgent;
 
 #[actix_web::main]
@@ -14,8 +12,8 @@ async fn main() -> anyhow::Result<()> {
     let application = Application::build(settings, agent_tx).await?;
     let application_task = tokio::spawn(application.run());
     let agent_task = tokio::spawn(agent.run());
-    // TODO: handle agent run exit and thread join
 
+    // TODO: handle agent run exit and thread join
     tokio::select! {
         o = application_task => {log::info!("Application task");},
         o = agent_task =>  { log::info!("Application task"); }
