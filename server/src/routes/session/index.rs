@@ -24,7 +24,10 @@ pub async fn session_index(
             render_context.insert("session_url", &id.to_string());
         }
 
-        render_context.insert("display_name", &user_info.display_name.unwrap());
+        render_context.insert(
+            "display_name",
+            &user_info.display_name.unwrap()
+        );
         render_context.insert("context", &context.to_string());
     } else {
         log::info!("Failed to spotify.me()");

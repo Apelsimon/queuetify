@@ -2,7 +2,6 @@ use rspotify::{scopes, AuthCodeSpotify, Config, Credentials, OAuth};
 
 use crate::configuration::SpotifySettings;
 use crate::db::Database;
-use crate::routes::utils::e500;
 use rspotify::clients::BaseClient;
 use rspotify::Token;
 use secrecy::ExposeSecret;
@@ -48,7 +47,7 @@ pub async fn get_token_string(spotify: &AuthCodeSpotify) -> Result<String, serde
     serde_json::to_string(&token)
 }
 
-fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Error> {
+pub fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Error> {
     let token = serde_json::from_str::<Token>(token)?;
     Ok(AuthCodeSpotify::from_token(token))
 }
@@ -56,8 +55,8 @@ fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Error> 
 pub async fn get_spotify_from_db(
     id: Uuid,
     db: &Database,
-) -> Result<AuthCodeSpotify, actix_web::Error> {
-    let session = db.get_session(id).await.map_err(e500)?;
-    let spotify = from_token_string(&session.token).map_err(e500)?;
+) -> Result<AuthCodeSpotify, anyhow::Error> {
+    let session = db.get_session(id).await?;
+    let spotify = from_token_string(&session.token)?;
     Ok(spotify)
 }

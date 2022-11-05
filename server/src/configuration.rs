@@ -1,7 +1,7 @@
 use config::Config;
 use secrecy::Secret;
 
-#[derive(serde:: Deserialize)]
+#[derive(serde:: Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
@@ -9,13 +9,13 @@ pub struct Settings {
     pub redis_uri: Secret<String>,
 }
 
-#[derive(serde:: Deserialize)]
+#[derive(serde:: Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub port: u16,
     pub hmac_secret: Secret<String>,
 }
 
-#[derive(serde:: Deserialize)]
+#[derive(serde:: Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: Secret<String>,

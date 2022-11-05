@@ -1,4 +1,4 @@
-use crate::controller::SearchResult;
+use crate::session_agent::SearchResult;
 use actix::prelude::{Message, Recipient};
 use rspotify::model::TrackId;
 use serde::{Deserialize, Serialize};
