@@ -1,18 +1,24 @@
-use crate::session_agent::SearchResult;
+use crate::session_agent::{SearchResult, State};
 use actix::prelude::{Message, Recipient};
 use rspotify::model::TrackId;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SearchResultPayload {
     pub payload: SearchResult,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
+pub struct StateUpdatePayload {
+    pub payload: State,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Response {
     SearchResult(SearchResultPayload),
+    StateUpdate(StateUpdatePayload),
 }
 
 #[derive(Message)]
@@ -53,7 +59,7 @@ pub struct Search {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SearchComplete {
-    pub result: SearchResult,
+    pub result: SearchResultPayload,
     pub connection_id: Uuid,
 }
 
@@ -61,5 +67,12 @@ pub struct SearchComplete {
 #[rtype(result = "()")]
 pub struct Queue {
     pub track_id: TrackId,
+    pub session_id: Uuid,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct StateUpdate {
+    pub update: StateUpdatePayload,
     pub session_id: Uuid,
 }

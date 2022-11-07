@@ -9,6 +9,10 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             let searchResults = result.payload as SearchResults
             searchResultsList.textContent = ""
             searchResultsList.appendChild(createSearchResultList(searchResults))
+            break;
+        }
+        case "StateUpdate": {
+            console.log("Receive state update: ", result.payload)
         }
     }
 }

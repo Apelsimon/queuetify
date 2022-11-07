@@ -1,5 +1,5 @@
 use crate::controller::messages::{
-    ClientActorMessage, Connect, Disconnect, Queue, Search, SearchComplete, WsMessage,
+    ClientActorMessage, Connect, Disconnect, Queue, Search, SearchComplete, StateUpdate, WsMessage,
 };
 use crate::controller::messages::{Response, SearchResultPayload};
 use crate::session_agent::{SessionAgentRequest, UPDATE_STATE_INTERVAL};
@@ -37,22 +37,15 @@ impl Controller {
     }
 }
 
-// queue state poller:
-// - iterate over sessions
-// - if current playing track in spotify is not current_track_uri or non is playing
-// -- play current_track_uri
-// - if current playing track has less than 3s left in spotify:
-// -- add first in queue to spotify queue, if successful remove from db queue, and replace current_track_uri with first one in queue
-
 impl Actor for Controller {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(UPDATE_STATE_INTERVAL, |actor, ctx| {
             for (session_id, _) in actor.sessions.iter() {
-                let request = SessionAgentRequest::UpdateState(*session_id);
+                let request = SessionAgentRequest::PollState((*session_id, ctx.address()));
                 if let Err(err) = actor.agent_tx.send(request) {
-                    log::error!("Failed to send SessionAgentRequest::UpdateState, {err}");
+                    log::error!("Failed to send SessionAgentRequest::PollState, {err}");
                 }
             }
         });
@@ -143,9 +136,7 @@ impl Handler<SearchComplete> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: SearchComplete, _ctx: &mut Context<Self>) -> Self::Result {
-        let response = Response::SearchResult(SearchResultPayload {
-            payload: msg.result,
-        });
+        let response = Response::SearchResult(msg.result);
         self.send_message(response, &msg.connection_id);
     }
 }
@@ -153,11 +144,23 @@ impl Handler<SearchComplete> for Controller {
 impl Handler<Queue> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: Queue, _: &mut Context<Self>) -> Self::Result {
-        log::info!("queue track: {}", msg.track_id.to_string());
-        let request = SessionAgentRequest::Queue(msg);
+    fn handle(&mut self, msg: Queue, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::Queue((msg, ctx.address()));
         if let Err(err) = self.agent_tx.send(request) {
             log::error!("Failed to send SessionAgentRequest::Queue, {err}");
         }
+    }
+}
+
+impl Handler<StateUpdate> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: StateUpdate, _: &mut Context<Self>) -> Self::Result {
+        let response = Response::StateUpdate(msg.update);
+        self.sessions
+            .get(&msg.session_id)
+            .unwrap()
+            .iter()
+            .for_each(|client| self.send_message(response.clone(), client)); // TODO: clone needed?
     }
 }

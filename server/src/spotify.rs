@@ -52,6 +52,7 @@ pub fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Err
     Ok(AuthCodeSpotify::from_token(token))
 }
 
+// TODO: move to db impl?
 pub async fn get_spotify_from_db(
     id: Uuid,
     db: &Database,

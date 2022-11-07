@@ -18,6 +18,11 @@ pub struct Session {
     pub current_track_uri: Option<String>,
 }
 
+pub struct State {
+    pub current_track_uri: Option<TrackId>,
+    pub current_queue: Vec<TrackId>,
+}
+
 // TODO: take TrackId references instead?
 impl Database {
     pub fn new(settings: &DatabaseSettings) -> Self {
@@ -75,12 +80,12 @@ impl Database {
         Ok(session)
     }
 
-    pub async fn get_current_track(
+    async fn get_current_track_impl(
         &self,
+        transaction: &mut Transaction<'static, Postgres>,
         id: Uuid,
-    ) -> Result<(Option<TrackId>, Transaction<'static, Postgres>), sqlx::Error> {
-        let mut transaction = self.pool.begin().await?;
-        let session = self.get_session_impl(&mut transaction, id).await?;
+    ) -> Result<Option<TrackId>, sqlx::Error> {
+        let session = self.get_session_impl(transaction, id).await?;
 
         let track_id: Option<TrackId> = match session.current_track_uri {
             Some(current_track_uri) => {
@@ -92,6 +97,15 @@ impl Database {
             None => None,
         };
 
+        Ok(track_id)
+    }
+
+    pub async fn get_current_track(
+        &self,
+        id: Uuid,
+    ) -> Result<(Option<TrackId>, Transaction<'static, Postgres>), sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let track_id = self.get_current_track_impl(&mut transaction, id).await?;
         Ok((track_id, transaction))
     }
 
@@ -172,6 +186,44 @@ impl Database {
         };
 
         Ok(track_id)
+    }
+
+    async fn get_queue_impl(
+        &self,
+        transaction: &mut Transaction<'static, Postgres>,
+        id: Uuid,
+    ) -> Result<Vec<TrackId>, sqlx::Error> {
+        let uris: Vec<(String,)> = sqlx::query_as(
+            r#"
+                    SELECT track_uri FROM queued_tracks where session_id = $1
+                "#,
+        )
+        .bind(id)
+        .fetch_all(transaction)
+        .await?;
+
+        let mut queue = Vec::new();
+        for (uri,) in uris.iter() {
+            match TrackId::from_str(&uri) {
+                Ok(id) => {
+                    queue.push(id);
+                }
+                _ => {}
+            }
+        }
+
+        Ok(queue)
+    }
+
+    pub async fn get_current_state(&self, id: Uuid) -> Result<State, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let current_track_uri = self.get_current_track_impl(&mut transaction, id).await?;
+        let current_queue = self.get_queue_impl(&mut transaction, id).await?;
+        transaction.commit().await?;
+        Ok(State {
+            current_track_uri,
+            current_queue,
+        })
     }
 }
 

@@ -1,6 +1,8 @@
 use crate::configuration::Settings;
 use crate::controller;
-use crate::controller::messages::SearchComplete;
+use crate::controller::messages::{
+    SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload,
+};
 use crate::controller::Controller;
 use crate::db::Database;
 use crate::spotify::get_spotify_from_db;
@@ -9,8 +11,8 @@ use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::device::Device;
 use rspotify::model::enums::misc::Market;
 use rspotify::model::enums::types::DeviceType;
-use rspotify::model::TrackId;
 use rspotify::model::{AdditionalType, PlayableId, PlayableItem, SimplifiedArtist};
+use rspotify::model::{FullTrack, TrackId};
 use rspotify::model::{SearchResult::Tracks, SearchType};
 use rspotify::AuthCodeSpotify;
 use rspotify::ClientError;
@@ -22,8 +24,8 @@ use uuid::Uuid;
 
 pub enum SessionAgentRequest {
     Search((controller::Search, Addr<Controller>)),
-    Queue(controller::Queue),
-    UpdateState(Uuid),
+    Queue((controller::Queue, Addr<Controller>)),
+    PollState((Uuid, Addr<Controller>)),
 }
 
 pub struct SessionAgent {
@@ -51,20 +53,36 @@ impl SessionAgent {
             match request {
                 SessionAgentRequest::Search((msg, addr)) => {
                     if let Ok(search_result) = on_search(&msg, &self.db).await {
+                        // TODO: have on search return complete SearchComplete strutc
                         addr.do_send(SearchComplete {
-                            result: search_result,
+                            result: SearchResultPayload {
+                                payload: search_result,
+                            },
                             connection_id: msg.connection_id,
                         });
                     }
                 }
-                SessionAgentRequest::Queue(msg) => {
-                    if let Err(err) = on_queue(msg, &self.db).await {
-                        log::error!("Error on queue {err}");
+                SessionAgentRequest::Queue((msg, addr)) => {
+                    let result = on_queue(msg, &self.db).await;
+                    match result {
+                        Ok(update) => {
+                            addr.do_send(update);
+                        }
+                        Err(err) => {
+                            log::error!("Error on queue {err}");
+                        }
                     }
                 }
-                SessionAgentRequest::UpdateState(id) => {
-                    if let Err(err) = on_update_state(id, &self.db).await {
-                        log::error!("Error on update state {err}");
+                SessionAgentRequest::PollState((id, addr)) => {
+                    match on_poll_state(id, &self.db).await {
+                        Ok(update) => {
+                            if let Some(update) = update {
+                                addr.do_send(update);
+                            }
+                        },
+                        Err(err) => {
+                            log::error!("Error on update state {err}");
+                        }
                     }
                 }
             }
@@ -72,16 +90,39 @@ impl SessionAgent {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 struct TrackInfo {
     name: String,
     artists: Vec<String>,
     id: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+impl TryFrom<FullTrack> for TrackInfo {
+    type Error = ();
+
+    fn try_from(track: FullTrack) -> Result<Self, Self::Error> {
+        let track_id = match track.id {
+            Some(tid) => tid,
+            None => return Err(()),
+        };
+
+        Ok(TrackInfo {
+            name: track.name,
+            artists: build_artist_string_vec(&track.artists),
+            id: track_id.to_string(),
+        })
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct SearchResult {
     tracks: Vec<TrackInfo>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct State {
+    current_track: Option<TrackInfo>,
+    current_queue: Vec<TrackInfo>,
 }
 
 fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
@@ -112,17 +153,11 @@ async fn get_search_results(
         .await?
     {
         for item in track_pages.items {
-            let track_id = match item.id {
-                Some(tid) => tid,
-                None => continue,
+            let track_info = match TrackInfo::try_from(item) {
+                Ok(info) => info,
+                Err(_) => continue,
             };
-
-            let track = TrackInfo {
-                name: item.name,
-                artists: build_artist_string_vec(&item.artists),
-                id: track_id.to_string(),
-            };
-            search_result.tracks.push(track);
+            search_result.tracks.push(track_info);
         }
     }
 
@@ -139,6 +174,7 @@ async fn on_search(msg: &controller::Search, db: &Database) -> Result<SearchResu
     Err(())
 }
 
+//TODO: should be removed when device is selectable
 async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, anyhow::Error> {
     match spotify.device().await {
         Ok(devices) => {
@@ -171,7 +207,51 @@ async fn start_playback(spotify: &AuthCodeSpotify, id: TrackId) -> Result<(), an
     Ok(())
 }
 
-async fn on_queue(msg: controller::Queue, db: &Database) -> Result<(), anyhow::Error> {
+async fn get_current_state(
+    id: Uuid,
+    spotify: &AuthCodeSpotify,
+    db: &Database,
+) -> Result<StateUpdate, anyhow::Error> {
+    let state = db.get_current_state(id).await?;
+    let current_track = match state.current_track_uri {
+        Some(current_track_id) => {
+            let current_track = spotify.track(&current_track_id).await?;
+            match TrackInfo::try_from(current_track) {
+                Ok(info) => Some(info),
+                Err(_) => None,
+            }
+        }
+        None => None,
+    };
+
+    let mut current_queue = Vec::new();
+
+    if !state.current_queue.is_empty() {
+        let tracks = state.current_queue.iter().collect::<Vec<_>>();
+        let queue = spotify.tracks(tracks, None).await?;
+        
+
+        for track in queue.iter() {
+            match TrackInfo::try_from(track.clone()) {
+                Ok(info) => {
+                    current_queue.push(info);
+                }
+                Err(_) => {}
+            }
+        }
+    }    
+
+    let payload = State {
+        current_track,
+        current_queue,
+    };
+    Ok(StateUpdate {
+        update: StateUpdatePayload { payload },
+        session_id: id,
+    })
+}
+
+async fn on_queue(msg: controller::Queue, db: &Database) -> Result<StateUpdate, anyhow::Error> {
     let spotify = get_spotify_from_db(msg.session_id, &db).await?;
 
     let (track, transaction) = db.get_current_track(msg.session_id).await?;
@@ -188,18 +268,22 @@ async fn on_queue(msg: controller::Queue, db: &Database) -> Result<(), anyhow::E
         }
     }
 
-    Ok(())
+    let state = get_current_state(msg.session_id, &spotify, &db).await?;
+    Ok(state)
 }
 
 pub const UPDATE_STATE_INTERVAL: Duration = Duration::from_secs(5);
 
-async fn on_update_state(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
+async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, anyhow::Error> {
     log::info!("update state for {id}");
     let spotify = get_spotify_from_db(id, &db).await?;
     let (track, mut transaction) = db.get_current_track(id).await?;
     match track {
         Some(expected_playing_id) => {
-            match spotify.current_playing(None, None::<Vec<&AdditionalType>>).await? {
+            match spotify
+                .current_playing(None, None::<Vec<&AdditionalType>>)
+                .await?
+            {
                 Some(current_playing_context) => match current_playing_context.item {
                     Some(PlayableItem::Track(track)) => {
                         if let Some(actual_playing_id) = track.id {
@@ -209,20 +293,18 @@ async fn on_update_state(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
                                 if current_playing_context.is_playing {
                                     match current_playing_context.progress {
                                         Some(duration) => {
-                                            if (track.duration - duration) < UPDATE_STATE_INTERVAL
-                                            {
+                                            if (track.duration - duration) < UPDATE_STATE_INTERVAL {
                                                 match db
                                                     .pop_track_from_queue(id, &mut transaction)
                                                     .await?
                                                 {
                                                     Some(new_track) => {
-                                                        db
-                                                            .set_current_track(
-                                                                transaction,
-                                                                id,
-                                                                Some(new_track.clone()),
-                                                            )
-                                                            .await?;
+                                                        db.set_current_track(
+                                                            transaction,
+                                                            id,
+                                                            Some(new_track.clone()),
+                                                        )
+                                                        .await?;
                                                         spotify
                                                             .add_item_to_queue(&new_track, None)
                                                             .await?
@@ -232,10 +314,15 @@ async fn on_update_state(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
                                                             .await?;
                                                     }
                                                 }
+
+                                                let state = get_current_state(id, &spotify, &db).await?;
+                                                return Ok(Some(state));
                                             }
                                         }
                                         None => {
-                                            log::error!("Progress missing for current playing context!");
+                                            log::error!(
+                                                "Progress missing for current playing context!"
+                                            );
                                             todo!();
                                         }
                                     }
@@ -267,5 +354,5 @@ async fn on_update_state(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
         }
     }
 
-    Ok(())
+    Ok(None)
 }
