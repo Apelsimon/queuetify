@@ -1,5 +1,5 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{Connect, Disconnect, Queue, Search, WsMessage};
+use crate::controller::messages::{Connect, Disconnect, State, Queue, Search, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -98,6 +98,7 @@ struct QueuePayload {
 enum Request {
     Search(SearchPayload),
     Queue(QueuePayload),
+    State
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
@@ -139,7 +140,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                                     session_id: self.session_id,
                                 })
                             }
-                        }
+                        },
+                        Request::State => {
+                            log::info!("Fetch state!!");
+                            self.controller_addr.do_send(State {
+                                session_id: self.session_id
+                            })
+                        },
                     }
                 }
             }

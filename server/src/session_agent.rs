@@ -25,6 +25,7 @@ use uuid::Uuid;
 pub enum SessionAgentRequest {
     Search((controller::Search, Addr<Controller>)),
     Queue((controller::Queue, Addr<Controller>)),
+    GetState((Uuid, Addr<Controller>)),
     PollState((Uuid, Addr<Controller>)),
 }
 
@@ -61,7 +62,7 @@ impl SessionAgent {
                             connection_id: msg.connection_id,
                         });
                     }
-                }
+                },
                 SessionAgentRequest::Queue((msg, addr)) => {
                     let result = on_queue(msg, &self.db).await;
                     match result {
@@ -72,7 +73,21 @@ impl SessionAgent {
                             log::error!("Error on queue {err}");
                         }
                     }
-                }
+                },
+                SessionAgentRequest::GetState((id, addr)) => {
+                    let spotify = match get_spotify_from_db(id, &self.db).await {
+                        Ok(spotify) => spotify,
+                        Err(_) => continue,
+                    };
+                    match get_current_state(id, &spotify, &self.db).await {
+                        Ok(update) => {
+                            addr.do_send(update);
+                        },
+                        Err(err) => {
+                            log::error!("Failed to get current state {err}");
+                        }
+                    }
+                },
                 SessionAgentRequest::PollState((id, addr)) => {
                     match on_poll_state(id, &self.db).await {
                         Ok(update) => {
@@ -121,8 +136,8 @@ pub struct SearchResult {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct State {
-    current_track: Option<TrackInfo>,
-    current_queue: Vec<TrackInfo>,
+    track: Option<TrackInfo>,
+    queue: Vec<TrackInfo>,
 }
 
 fn build_artist_string_vec(artists: &Vec<SimplifiedArtist>) -> Vec<String> {
@@ -242,8 +257,8 @@ async fn get_current_state(
     }    
 
     let payload = State {
-        current_track,
-        current_queue,
+        track: current_track,
+        queue: current_queue,
     };
     Ok(StateUpdate {
         update: StateUpdatePayload { payload },

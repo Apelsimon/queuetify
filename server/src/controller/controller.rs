@@ -1,5 +1,5 @@
 use crate::controller::messages::{
-    ClientActorMessage, Connect, Disconnect, Queue, Search, SearchComplete, StateUpdate, WsMessage,
+    ClientActorMessage, Connect, Disconnect, State, Queue, Search, SearchComplete, StateUpdate, WsMessage,
 };
 use crate::controller::messages::{Response, SearchResultPayload};
 use crate::session_agent::{SessionAgentRequest, UPDATE_STATE_INTERVAL};
@@ -149,6 +149,17 @@ impl Handler<Queue> for Controller {
         if let Err(err) = self.agent_tx.send(request) {
             log::error!("Failed to send SessionAgentRequest::Queue, {err}");
         }
+    }
+}
+
+impl Handler<State> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: State, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::GetState((msg.session_id, ctx.address()));
+            if let Err(err) = self.agent_tx.send(request) {
+                log::error!("Failed to send SessionAgentRequest::GetState, {err}");
+            }
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::session_agent::{SearchResult, State};
+use crate::session_agent::{self, SearchResult};
 use actix::prelude::{Message, Recipient};
 use rspotify::model::TrackId;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ pub struct SearchResultPayload {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StateUpdatePayload {
-    pub payload: State,
+    pub payload: session_agent::State,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -68,6 +68,12 @@ pub struct SearchComplete {
 pub struct Queue {
     pub track_id: TrackId,
     pub session_id: Uuid,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct State {
+    pub session_id: Uuid
 }
 
 #[derive(Message)]

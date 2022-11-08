@@ -1,25 +1,6 @@
 import useWebSocket from "./websocket"
 import "./css/base.css"
 
-const onMessageCb = (ev: MessageEvent<any>) => {
-    let result = JSON.parse(ev.data)
-
-    switch (result.type) {
-        case "SearchResult": {
-            let searchResults = result.payload as SearchResults
-            searchResultsList.textContent = ""
-            searchResultsList.appendChild(createSearchResultList(searchResults))
-            break;
-        }
-        case "StateUpdate": {
-            console.log("Receive state update: ", result.payload)
-        }
-    }
-}
-
-const { doConnect, doSend } = useWebSocket(onMessageCb)
-doConnect()
-
 interface TrackInfo {
     name: string;
     artists: string[];
@@ -30,7 +11,50 @@ interface SearchResults {
     tracks: TrackInfo[];
 }
 
-const createSearchResultListEntry = (info: TrackInfo) => {
+interface StateUpdate {
+    track: TrackInfo | null;
+    queue: TrackInfo[];
+}
+
+const onMessageCb = (ev: MessageEvent<any>) => {
+    let result = JSON.parse(ev.data)
+
+    switch (result.type) {
+        case "SearchResult": {
+            let searchResults = result.payload as SearchResults
+            searchResultsList.textContent = ""
+            searchResultsList.appendChild(createTrackList(searchResults.tracks))
+            break;
+        }
+        case "StateUpdate": {
+            let stateUpdate = result.payload as StateUpdate
+            trackQueue.textContent = ""
+
+            if (stateUpdate.track) {
+                var paragraph = document.createElement("p")
+                paragraph.textContent = "Current track: " + stateUpdate.track.name + " - " + stateUpdate.track.artists
+                trackQueue.appendChild(paragraph)
+            }
+            
+            trackQueue.appendChild(createTrackList(stateUpdate.queue))
+            console.log("Receive state update: ", result.payload)
+            break;
+        }
+    }
+}
+
+const { doConnect, doSend } = useWebSocket(onMessageCb)
+
+const onOpenCb = () => {
+    console.log("Fetch state!")
+    const stateRequest = { type: "State" }
+    doSend(JSON.stringify(stateRequest))
+}
+
+doConnect(onOpenCb)
+
+
+const createTrackListEntry = (info: TrackInfo) => {
     var listEntry = document.createElement("li")
     
     var paragraph = document.createElement("p")
@@ -53,17 +77,18 @@ const createSearchResultListEntry = (info: TrackInfo) => {
     return listEntry
 }
 
-const createSearchResultList = (results: SearchResults) => {
+const createTrackList = (tracks: TrackInfo[]) => {
     var container = document.createElement("ul")
     
-    for (var track of results.tracks) {
-        container.appendChild(createSearchResultListEntry(track))
+    for (var track of tracks) {
+        container.appendChild(createTrackListEntry(track))
     }
 
     return container
 }
 
 const searchResultsList = document.querySelector<HTMLDivElement>("#search-results")
+const trackQueue = document.querySelector<HTMLDivElement>("#track-queue")
 const searchInput = document.querySelector<HTMLInputElement>("#search-input")
 
 const searchButton = document.querySelector<HTMLButtonElement>("#search-btn")

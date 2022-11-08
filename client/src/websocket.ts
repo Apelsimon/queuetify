@@ -1,7 +1,7 @@
     
 let socket: WebSocket = null;
 
-const connect = (onMessageCb: (ev: MessageEvent<any>) => any) =>  {
+const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => void) =>  {
     doDisconnect()
 
     const { location } = window
@@ -14,6 +14,7 @@ const connect = (onMessageCb: (ev: MessageEvent<any>) => any) =>  {
 
     socket.onopen = () => {
       console.log('Connected')
+      onOpenCb()
     }
 
     socket.onmessage = onMessageCb
