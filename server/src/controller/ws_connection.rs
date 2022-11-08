@@ -142,9 +142,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                             }
                         },
                         Request::State => {
-                            log::info!("Fetch state!!");
                             self.controller_addr.do_send(State {
-                                session_id: self.session_id
+                                session_id: self.session_id,
+                                connection_id: self.connection_id
                             })
                         },
                     }

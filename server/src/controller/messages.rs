@@ -73,7 +73,8 @@ pub struct Queue {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct State {
-    pub session_id: Uuid
+    pub session_id: Uuid,
+    pub connection_id: Uuid
 }
 
 #[derive(Message)]
@@ -81,4 +82,5 @@ pub struct State {
 pub struct StateUpdate {
     pub update: StateUpdatePayload,
     pub session_id: Uuid,
+    pub connection_id: Option<Uuid>
 }

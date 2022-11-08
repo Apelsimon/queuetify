@@ -25,7 +25,7 @@ use uuid::Uuid;
 pub enum SessionAgentRequest {
     Search((controller::Search, Addr<Controller>)),
     Queue((controller::Queue, Addr<Controller>)),
-    GetState((Uuid, Addr<Controller>)),
+    GetState((Uuid, Option<Uuid>, Addr<Controller>)),
     PollState((Uuid, Addr<Controller>)),
 }
 
@@ -74,12 +74,12 @@ impl SessionAgent {
                         }
                     }
                 },
-                SessionAgentRequest::GetState((id, addr)) => {
+                SessionAgentRequest::GetState((id, connection_id, addr)) => {
                     let spotify = match get_spotify_from_db(id, &self.db).await {
                         Ok(spotify) => spotify,
                         Err(_) => continue,
                     };
-                    match get_current_state(id, &spotify, &self.db).await {
+                    match get_current_state(id, connection_id, &spotify, &self.db).await {
                         Ok(update) => {
                             addr.do_send(update);
                         },
@@ -96,7 +96,7 @@ impl SessionAgent {
                             }
                         },
                         Err(err) => {
-                            log::error!("Error on update state {err}");
+                            log::error!("Error on poll state {err}");
                         }
                     }
                 }
@@ -224,6 +224,7 @@ async fn start_playback(spotify: &AuthCodeSpotify, id: TrackId) -> Result<(), an
 
 async fn get_current_state(
     id: Uuid,
+    connection_id: Option<Uuid>,
     spotify: &AuthCodeSpotify,
     db: &Database,
 ) -> Result<StateUpdate, anyhow::Error> {
@@ -263,6 +264,7 @@ async fn get_current_state(
     Ok(StateUpdate {
         update: StateUpdatePayload { payload },
         session_id: id,
+        connection_id
     })
 }
 
@@ -283,7 +285,7 @@ async fn on_queue(msg: controller::Queue, db: &Database) -> Result<StateUpdate, 
         }
     }
 
-    let state = get_current_state(msg.session_id, &spotify, &db).await?;
+    let state = get_current_state(msg.session_id, None, &spotify, &db).await?;
     Ok(state)
 }
 
@@ -330,7 +332,7 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                                     }
                                                 }
 
-                                                let state = get_current_state(id, &spotify, &db).await?;
+                                                let state = get_current_state(id, None, &spotify, &db).await?;
                                                 return Ok(Some(state));
                                             }
                                         }

@@ -156,7 +156,7 @@ impl Handler<State> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: State, ctx: &mut Context<Self>) -> Self::Result {
-        let request = SessionAgentRequest::GetState((msg.session_id, ctx.address()));
+        let request = SessionAgentRequest::GetState((msg.session_id, Some(msg.connection_id), ctx.address()));
             if let Err(err) = self.agent_tx.send(request) {
                 log::error!("Failed to send SessionAgentRequest::GetState, {err}");
             }
@@ -172,6 +172,13 @@ impl Handler<StateUpdate> for Controller {
             .get(&msg.session_id)
             .unwrap()
             .iter()
+            .filter(|connection_id| {
+                if let Some(id) = msg.connection_id {
+                    return id == *connection_id.to_owned();
+                }
+
+                return true;
+            })
             .for_each(|client| self.send_message(response.clone(), client)); // TODO: clone needed?
     }
 }
