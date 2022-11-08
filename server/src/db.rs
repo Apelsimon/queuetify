@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::configuration::DatabaseSettings;
+use crate::controller::Vote;
 use rspotify::model::TrackId;
 use secrecy::ExposeSecret;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -164,7 +165,7 @@ impl Database {
         &self,
         id: Uuid,
         transaction: &mut Transaction<'static, Postgres>,
-    ) -> Result<Option<TrackId>, sqlx::Error> {
+    ) -> Result<Option<TrackId>, sqlx::Error> {        
         let result: Option<(String,)> = sqlx::query_as(
             r#"
                 DELETE FROM queued_tracks 
@@ -195,7 +196,7 @@ impl Database {
     ) -> Result<Vec<TrackId>, sqlx::Error> {
         let uris: Vec<(String,)> = sqlx::query_as(
             r#"
-                    SELECT track_uri FROM queued_tracks where session_id = $1
+                    SELECT track_uri FROM queued_tracks where session_id = $1 ORDER BY votes DESC
                 "#,
         )
         .bind(id)
@@ -224,6 +225,54 @@ impl Database {
             current_track_uri,
             current_queue,
         })
+    }
+
+    pub async fn add_vote(&self, msg: &Vote) -> Result<(), sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query!(
+            r#"
+                INSERT INTO votes
+                    (client_id, session_id, track_uri)
+                VALUES ($1, $2, $3)
+            "#,
+            msg.connection_id,
+            msg.session_id,
+            msg.track_id.to_string(),
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        sqlx::query!(
+            r#"
+                UPDATE queued_tracks 
+                SET 
+                    votes = votes + 1
+                WHERE
+                    track_uri = $1 and session_id = $2
+            "#,            
+            msg.track_id.to_string(),
+            msg.session_id,
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    pub async fn remove_votes(&self, transaction: &mut Transaction<'static, Postgres>,
+    id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            DELETE FROM votes 
+            WHERE track_uri = $1 and session_id = $2
+            "#,            
+            track_id.to_string(),
+            id
+        )
+        .execute(transaction)
+        .await?;
+        Ok(())
     }
 }
 

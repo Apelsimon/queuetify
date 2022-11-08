@@ -33,6 +33,7 @@ pub async fn callback(
     }
 
     let session_id = Uuid::new_v4();
+    // TODO: hash token?
     let token = get_token_string(&spotify).await?;
 
     db.new_session(session_id, &token).await.map_err(e500)?;

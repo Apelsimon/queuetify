@@ -12,7 +12,8 @@ pub async fn ws_connect(
 ) -> Result<HttpResponse, Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let session_id = session.get_id().unwrap().unwrap();
-    let ws = WsConnection::new(session_id, controller.get_ref().clone());
+    let client_id = session.get_client_id().unwrap().unwrap();
+    let ws = WsConnection::new(session_id, client_id, controller.get_ref().clone());
 
     let resp = ws::start(ws, &req, stream)?;
     Ok(resp)

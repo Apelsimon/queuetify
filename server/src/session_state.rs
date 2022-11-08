@@ -28,17 +28,22 @@ impl fmt::Display for Context {
 
 impl TypedSession {
     const ID_KEY: &'static str = "id";
+    const CLIENT_ID_KEY: &'static str = "client_id";
     const CONTEXT_ID_KEY: &'static str = "context_id";
 
     pub fn renew(&self, id: Uuid, ctx: Context) -> Result<(), serde_json::Error> {
         self.0.renew();
 
         self.0.insert(Self::ID_KEY, id)?;
+        self.0.insert(Self::CLIENT_ID_KEY, Uuid::new_v4())?;
         self.0.insert(Self::CONTEXT_ID_KEY, ctx)
     }
 
     pub fn get_id(&self) -> Result<Option<Uuid>, serde_json::Error> {
         self.0.get(Self::ID_KEY)
+    }
+    pub fn get_client_id(&self) -> Result<Option<Uuid>, serde_json::Error> {
+        self.0.get(Self::CLIENT_ID_KEY)
     }
     pub fn get_context(&self) -> Result<Option<Context>, serde_json::Error> {
         self.0.get(Self::CONTEXT_ID_KEY)

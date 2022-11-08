@@ -42,14 +42,6 @@ pub struct Disconnect {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ClientActorMessage {
-    pub session_id: Uuid,
-    pub connection_id: Uuid,
-    pub msg: String,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
 pub struct Search {
     pub query: String,
     pub session_id: Uuid,
@@ -75,6 +67,14 @@ pub struct Queue {
 pub struct State {
     pub session_id: Uuid,
     pub connection_id: Uuid
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Vote {
+    pub track_id: TrackId,
+    pub session_id: Uuid,
+    pub connection_id: Uuid,
 }
 
 #[derive(Message)]

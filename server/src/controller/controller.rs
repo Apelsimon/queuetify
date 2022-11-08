@@ -1,7 +1,7 @@
 use crate::controller::messages::{
-    ClientActorMessage, Connect, Disconnect, State, Queue, Search, SearchComplete, StateUpdate, WsMessage,
+    Connect, Disconnect, State, Queue, Search, SearchComplete, StateUpdate, Vote, WsMessage,
 };
-use crate::controller::messages::{Response, SearchResultPayload};
+use crate::controller::messages::{Response};
 use crate::session_agent::{SessionAgentRequest, UPDATE_STATE_INTERVAL};
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::AsyncContext;
@@ -19,6 +19,7 @@ pub struct Controller {
 
 // TODO: handle all unwraps
 // TODO: add logging for errors
+// TODO: reuse msg when sending to agent_tx
 
 impl Controller {
     pub fn new(agent_tx: UnboundedSender<SessionAgentRequest>) -> Self {
@@ -57,14 +58,6 @@ impl Handler<Disconnect> for Controller {
 
     fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
         if self.clients.remove(&msg.connection_id).is_some() {
-            // self.sessions
-            //     .get(&msg.session_id)
-            //     .unwrap()
-            //     .iter()
-            //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-            //     .for_each(|user_id| {
-            //         self.send_message(&format!("{} disconnected.", &msg.connection_id), user_id)
-            //     });
             if let Some(session) = self.sessions.get_mut(&msg.session_id) {
                 if session.len() > 1 {
                     session.remove(&msg.connection_id);
@@ -87,37 +80,8 @@ impl Handler<Connect> for Controller {
             .or_insert_with(HashSet::new)
             .insert(msg.connection_id);
 
-        // send to everyone in the room that new uuid just joined
-        // self.sessions
-        //     .get(&msg.session_id)
-        //     .unwrap()
-        //     .iter()
-        //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-        //     .for_each(|conn_id| {
-        //         self.send_message(&format!("{} just joined!", msg.connection_id), conn_id)
-        //     });
-
         // store the address
         self.clients.insert(msg.connection_id, msg.client_addr);
-
-        // send self your new uuid
-        // self.send_message(
-        //     &format!("your id is {}", msg.connection_id),
-        //     &msg.connection_id,
-        // );
-    }
-}
-
-impl Handler<ClientActorMessage> for Controller {
-    type Result = ();
-
-    fn handle(&mut self, msg: ClientActorMessage, _: &mut Context<Self>) -> Self::Result {
-        // self.sessions
-        //     .get(&msg.session_id)
-        //     .unwrap()
-        //     .iter()
-        //     .filter(|conn_id| *conn_id.to_owned() != msg.connection_id)
-        //     .for_each(|client| self.send_message(&msg.msg, client));
     }
 }
 
@@ -157,6 +121,17 @@ impl Handler<State> for Controller {
 
     fn handle(&mut self, msg: State, ctx: &mut Context<Self>) -> Self::Result {
         let request = SessionAgentRequest::GetState((msg.session_id, Some(msg.connection_id), ctx.address()));
+            if let Err(err) = self.agent_tx.send(request) {
+                log::error!("Failed to send SessionAgentRequest::GetState, {err}");
+            }
+    }
+}
+
+impl Handler<Vote> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Vote, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::Vote((msg, ctx.address()));
             if let Err(err) = self.agent_tx.send(request) {
                 log::error!("Failed to send SessionAgentRequest::GetState, {err}");
             }

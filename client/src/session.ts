@@ -23,7 +23,7 @@ const onMessageCb = (ev: MessageEvent<any>) => {
         case "SearchResult": {
             let searchResults = result.payload as SearchResults
             searchResultsList.textContent = ""
-            searchResultsList.appendChild(createTrackList(searchResults.tracks))
+            searchResultsList.appendChild(createTrackList(searchResults.tracks, "Add", queueTrack))
             break;
         }
         case "StateUpdate": {
@@ -36,7 +36,7 @@ const onMessageCb = (ev: MessageEvent<any>) => {
                 trackQueue.appendChild(paragraph)
             }
             
-            trackQueue.appendChild(createTrackList(stateUpdate.queue))
+            trackQueue.appendChild(createTrackList(stateUpdate.queue, "Vote", voteTrack))
             console.log("Receive state update: ", result.payload)
             break;
         }
@@ -46,7 +46,6 @@ const onMessageCb = (ev: MessageEvent<any>) => {
 const { doConnect, doSend } = useWebSocket(onMessageCb)
 
 const onOpenCb = () => {
-    console.log("Fetch state!")
     const stateRequest = { type: "State" }
     doSend(JSON.stringify(stateRequest))
 }
@@ -54,7 +53,19 @@ const onOpenCb = () => {
 doConnect(onOpenCb)
 
 
-const createTrackListEntry = (info: TrackInfo) => {
+const queueTrack = (ev: MouseEvent, trackId: string) => {
+    console.log("Queue track ", trackId)
+    const queueRequest = { type: "Queue", uri: trackId }
+    doSend(JSON.stringify(queueRequest))
+}
+
+const voteTrack = (ev: MouseEvent, trackId: string) => {
+    console.log("Vote for track ", trackId)
+    const voteRequets = { type: "Vote", uri: trackId }
+    doSend(JSON.stringify(voteRequets))
+}
+
+const createTrackListEntry = (info: TrackInfo, buttonText: string, onClickCb: (ev: MouseEvent, trackId: string) => void) => {
     var listEntry = document.createElement("li")
     
     var paragraph = document.createElement("p")
@@ -63,25 +74,24 @@ const createTrackListEntry = (info: TrackInfo) => {
 
     const callback = (ev: MouseEvent, trackId: string) => {
         ev.preventDefault()
-        const queueRequest = { type: "Queue", uri: trackId }
-        doSend(JSON.stringify(queueRequest))
+        onClickCb(ev, trackId)
     }
     const swap = function (trackId: string, ev: MouseEvent) {
         return this(ev, trackId);
     }
-    var addButton = document.createElement("button")
-    addButton.innerText = "Add"
-    addButton.addEventListener("click", swap.bind(callback, info.id))
-    listEntry.appendChild(addButton)
+    var button = document.createElement("button")
+    button.innerText = buttonText
+    button.addEventListener("click", swap.bind(callback, info.id))
+    listEntry.appendChild(button)
 
     return listEntry
 }
 
-const createTrackList = (tracks: TrackInfo[]) => {
+const createTrackList = (tracks: TrackInfo[], buttonText: string, onClickCb: (ev: MouseEvent, trackId: string) => void) => {
     var container = document.createElement("ul")
     
     for (var track of tracks) {
-        container.appendChild(createTrackListEntry(track))
+        container.appendChild(createTrackListEntry(track, buttonText, onClickCb))
     }
 
     return container
@@ -102,11 +112,5 @@ searchButton.addEventListener("click", (ev) => {
 
     const searchRequest = { type: "Search", query: input }
     doSend(JSON.stringify(searchRequest))
-})
-
-const wsPingButton = document.querySelector<HTMLButtonElement>("#ws-ping")
-wsPingButton.addEventListener("click", (ev) => {
-    ev.preventDefault()
-    doSend("Ping sent from some peer...")
 })
 

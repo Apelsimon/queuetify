@@ -27,6 +27,7 @@ pub enum SessionAgentRequest {
     Queue((controller::Queue, Addr<Controller>)),
     GetState((Uuid, Option<Uuid>, Addr<Controller>)),
     PollState((Uuid, Addr<Controller>)),
+    Vote((controller::Vote, Addr<Controller>))
 }
 
 pub struct SessionAgent {
@@ -97,6 +98,18 @@ impl SessionAgent {
                         },
                         Err(err) => {
                             log::error!("Error on poll state {err}");
+                        }
+                    }
+                },
+                SessionAgentRequest::Vote((msg, addr)) => {
+                    match on_vote(msg, &self.db).await {
+                        Ok(update) => {
+                            if let Some(update) = update {
+                                addr.do_send(update);
+                            }
+                        },
+                        Err(err) => {
+                            log::error!("Error on vote {err}");
                         }
                     }
                 }
@@ -316,6 +329,7 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                                     .await?
                                                 {
                                                     Some(new_track) => {
+                                                        db.remove_votes(&mut transaction, id, new_track.clone()).await?;
                                                         db.set_current_track(
                                                             transaction,
                                                             id,
@@ -372,4 +386,18 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
     }
 
     Ok(None)
+}
+
+async fn on_vote(msg: controller::Vote, db: &Database) -> Result<Option<StateUpdate>, anyhow::Error> {
+    match db.add_vote(&msg).await {
+        Ok(()) => {
+            let spotify = get_spotify_from_db(msg.session_id, &db).await?;
+            let state = get_current_state(msg.session_id, None, &spotify, &db).await?;
+            Ok(Some(state))
+        },
+        Err(_) => {
+            Ok(None)
+        }
+    }
+    
 }

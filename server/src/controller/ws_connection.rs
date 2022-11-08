@@ -1,5 +1,5 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{Connect, Disconnect, State, Queue, Search, WsMessage};
+use crate::controller::messages::{Connect, Disconnect, State, Queue, Search, Vote, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -20,16 +20,16 @@ pub struct WsConnection {
     session_id: Uuid,
     controller_addr: Addr<Controller>,
     last_heartbeat_timestamp: Instant,
-    connection_id: Uuid,
+    connection_id: Uuid, //TODO: change to client_id?
 }
 
 impl WsConnection {
-    pub fn new(session_id: Uuid, controller_addr: Addr<Controller>) -> Self {
+    pub fn new(session_id: Uuid, client_id: Uuid, controller_addr: Addr<Controller>) -> Self {
         Self {
             session_id,
             controller_addr,
             last_heartbeat_timestamp: Instant::now(),
-            connection_id: Uuid::new_v4(),
+            connection_id: client_id,
         }
     }
 
@@ -94,11 +94,17 @@ struct QueuePayload {
 }
 
 #[derive(Serialize, Deserialize)]
+struct VotePayload {
+    uri: String,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum Request {
     Search(SearchPayload),
     Queue(QueuePayload),
-    State
+    State,
+    Vote(VotePayload)
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
@@ -120,11 +126,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                 ctx.stop();
             }
             Ok(ws::Message::Nop) => (),
-            // Ok(Text(s)) => self.controller_addr.do_send(ClientActorMessage {
-            //     session_id: self.session_id,
-            //     connection_id: self.connection_id,
-            //     msg: s.to_string(),
-            // }),
             Ok(Text(s)) => {
                 if let Ok(req) = serde_json::from_str(&s.to_string()) {
                     match req {
@@ -147,6 +148,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                                 connection_id: self.connection_id
                             })
                         },
+                        Request::Vote(v) => {
+                            if let Ok(track_id) = TrackId::from_str(&v.uri) {
+                                self.controller_addr.do_send(Vote {
+                                    track_id,
+                                    session_id: self.session_id,
+                                    connection_id: self.connection_id,
+                                })
+                            }                            
+                        }
                     }
                 }
             }
