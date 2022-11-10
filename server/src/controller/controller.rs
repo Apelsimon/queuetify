@@ -195,7 +195,7 @@ impl Handler<Kill> for Controller {
 impl Handler<KillComplete> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: KillComplete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: KillComplete, _ctx: &mut Context<Self>) -> Self::Result {
         if let Some(session) = self.sessions.get(&msg.session_id) {
             let shutdown = Response::Shutdown;
             session.iter().for_each(|client| { 

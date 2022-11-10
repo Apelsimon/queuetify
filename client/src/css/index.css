@@ -1,0 +1,11 @@
+#app {
+    @apply flex h-screen
+}
+
+#app-container {
+    @apply m-auto flex flex-col items-center
+}
+
+h1 {
+    @apply text-2xl p-2
+}
