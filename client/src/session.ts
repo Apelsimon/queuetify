@@ -16,6 +16,10 @@ interface StateUpdate {
     queue: TrackInfo[];
 }
 
+const logout = () => {
+    window.location.href = "/session/logout"
+}
+
 const onMessageCb = (ev: MessageEvent<any>) => {
     let result = JSON.parse(ev.data)
 
@@ -39,6 +43,9 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             trackQueue.appendChild(createTrackList(stateUpdate.queue, "Vote", voteTrack))
             console.log("Receive state update: ", result.payload)
             break;
+        }
+        case "Shutdown": {
+            logout()
         }
     }
 }
@@ -114,3 +121,23 @@ searchButton.addEventListener("click", (ev) => {
     doSend(JSON.stringify(searchRequest))
 })
 
+const killSessionButton = document.querySelector<HTMLButtonElement>("#kill-session-btn")
+
+if (killSessionButton) {
+    killSessionButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        const killRequest = { type: "Kill"}
+        doSend(JSON.stringify(killRequest))
+    })
+}
+
+
+const logoutButton = document.querySelector<HTMLButtonElement>("#logout-btn")
+
+if (logoutButton) {
+    logoutButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        console.log("Do logout!")
+        logout()
+    })
+}

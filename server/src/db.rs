@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::configuration::DatabaseSettings;
+use crate::configuration::{DatabaseSettings, SpotifySettings};
 use crate::controller::Vote;
 use rspotify::model::TrackId;
 use secrecy::ExposeSecret;
@@ -8,10 +8,14 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::PgPool;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
+use rspotify::AuthCodeSpotify;
+use crate::spotify::{get_default_spotify, get_token_string, create_token_from_string};
+use rspotify::Token;
 
 #[derive(Clone)]
 pub struct Database {
     pool: PgPool,
+    spotify_settings: SpotifySettings
 }
 
 pub struct Session {
@@ -26,9 +30,10 @@ pub struct State {
 
 // TODO: take TrackId references instead?
 impl Database {
-    pub fn new(settings: &DatabaseSettings) -> Self {
+    pub fn new(settings: &DatabaseSettings, spotify_settings: SpotifySettings) -> Self {
         Self {
             pool: get_connection_pool(settings),
+            spotify_settings
         }
     }
 
@@ -54,6 +59,42 @@ impl Database {
         .execute(&self.pool)
         .await?;
 
+        Ok(())
+    }
+
+    pub async fn delete_session(&self, id: Uuid) -> Result<(), sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query!(
+            r#"
+                DELETE FROM votes 
+                WHERE session_id = $1
+            "#,
+            id
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        sqlx::query!(
+            r#"
+                DELETE FROM queued_tracks 
+                WHERE session_id = $1
+            "#,
+            id
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        sqlx::query!(
+            r#"
+                DELETE FROM sessions 
+                WHERE id = $1
+            "#,
+            id
+        )
+        .execute(&mut transaction)
+        .await?;
+
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -273,6 +314,34 @@ impl Database {
         .execute(transaction)
         .await?;
         Ok(())
+    }
+
+    pub async fn set_spotify(&self, id: Uuid, spotify: &AuthCodeSpotify) -> Result<(), anyhow::Error> {
+        let token = get_token_string(&spotify).await?;
+        sqlx::query!(
+            r#"
+            UPDATE sessions
+            SET
+                token = $2
+            WHERE id = $1
+            "#,
+            id,
+            token
+        )
+        .execute(&self.pool)
+        .await?;
+        
+        Ok(())
+    }
+
+    pub async fn get_spotify(&self,
+        id: Uuid,
+    ) -> Result<AuthCodeSpotify, anyhow::Error> {
+        let session = self.get_session(id).await?;
+        let spotify = get_default_spotify(&self.spotify_settings);
+        let token = create_token_from_string(&session.token)?;
+        *spotify.token.lock().await.unwrap() = Some(token);
+        Ok(spotify)
     }
 }
 

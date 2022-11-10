@@ -1,13 +1,14 @@
 use crate::controller::messages::{
-    Connect, Disconnect, State, Queue, Search, SearchComplete, StateUpdate, Vote, WsMessage,
+    Connect, Disconnect, Kill, KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, Vote, WsMessage,
 };
 use crate::controller::messages::{Response};
-use crate::session_agent::{SessionAgentRequest, UPDATE_STATE_INTERVAL};
+use crate::session_agent::{SessionAgentRequest};
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::AsyncContext;
 use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
+use std::time::Duration;
 
 type Socket = Recipient<WsMessage>;
 
@@ -20,6 +21,7 @@ pub struct Controller {
 // TODO: handle all unwraps
 // TODO: add logging for errors
 // TODO: reuse msg when sending to agent_tx
+// TODO: validate session id
 
 impl Controller {
     pub fn new(agent_tx: UnboundedSender<SessionAgentRequest>) -> Self {
@@ -38,11 +40,14 @@ impl Controller {
     }
 }
 
+pub const REFRESH_TOKEN_INTERVAL: Duration = Duration::from_secs(3600);
+pub const POLL_STATE_INTERVAL: Duration = Duration::from_secs(5);
+
 impl Actor for Controller {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(UPDATE_STATE_INTERVAL, |actor, ctx| {
+        ctx.run_interval(POLL_STATE_INTERVAL, |actor, ctx| {
             for (session_id, _) in actor.sessions.iter() {
                 let request = SessionAgentRequest::PollState((*session_id, ctx.address()));
                 if let Err(err) = actor.agent_tx.send(request) {
@@ -73,7 +78,7 @@ impl Handler<Disconnect> for Controller {
 impl Handler<Connect> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Connect, ctx: &mut Context<Self>) -> Self::Result {
         // create a room if necessary, and then add the id to it
         self.sessions
             .entry(msg.session_id)
@@ -82,6 +87,11 @@ impl Handler<Connect> for Controller {
 
         // store the address
         self.clients.insert(msg.connection_id, msg.client_addr);
+
+        ctx.address().do_send(Refresh{
+            duration: Duration::from_secs(1)/*REFRESH_TOKEN_INTERVAL*/,
+            session_id: msg.session_id
+        });
     }
 }
 
@@ -155,5 +165,42 @@ impl Handler<StateUpdate> for Controller {
                 return true;
             })
             .for_each(|client| self.send_message(response.clone(), client)); // TODO: clone needed?
+    }
+}
+
+impl Handler<Refresh> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Refresh, ctx: &mut Context<Self>) -> Self::Result {
+        ctx.run_later(msg.duration, move |actor, ctx| {
+            let request = SessionAgentRequest::Refresh((msg.session_id, ctx.address()));
+            if let Err(err) = actor.agent_tx.send(request) {
+                log::error!("Failed to send SessionAgentRequest::Refresh, {err}");
+            }
+        });        
+    }
+}
+
+impl Handler<Kill> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Kill, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::Kill((msg.session_id, ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::Kill, {err}");
+        }
+    }
+}
+
+impl Handler<KillComplete> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: KillComplete, ctx: &mut Context<Self>) -> Self::Result {
+        if let Some(session) = self.sessions.get(&msg.session_id) {
+            let shutdown = Response::Shutdown;
+            session.iter().for_each(|client| { 
+                self.send_message(shutdown.clone(), client);
+            });
+        }
     }
 }

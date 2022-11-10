@@ -11,10 +11,11 @@
 {% if context == "host" %}
     <h2>You're hosting the session with alias: {{ display_name }}</h2>
     <p>Session url: http://localhost:8080/join/{{ session_url }}</p>
+    <button id="kill-session-btn">Kill session</button>
 {% elif context == "peer" %}
     <h2>You've joined session hosted by: {{ display_name }}</h2>
-{% endif %}
-
+    <button id="logout-btn">Logout</button>    
+{% endif %}    
     <div class="search-container">
         <input id="search-input" type="text" placeholder="Search.." name="search">
         <button id="search-btn">Search<i class="fa fa-search"></i></button>

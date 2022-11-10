@@ -1,5 +1,5 @@
 use crate::controller::controller::Controller;
-use crate::controller::messages::{Connect, Disconnect, State, Queue, Search, Vote, WsMessage};
+use crate::controller::messages::{Connect, Disconnect, Kill, Queue, Search, State,Vote, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -104,7 +104,8 @@ enum Request {
     Search(SearchPayload),
     Queue(QueuePayload),
     State,
-    Vote(VotePayload)
+    Vote(VotePayload),
+    Kill
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
@@ -156,6 +157,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                                     connection_id: self.connection_id,
                                 })
                             }                            
+                        },
+                        Request::Kill => {
+                            self.controller_addr.do_send(Kill{
+                                session_id: self.session_id
+                            })
                         }
                     }
                 }

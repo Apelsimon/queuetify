@@ -2,7 +2,7 @@ use crate::configuration::Settings;
 use crate::controller::Controller;
 use crate::db::Database;
 use crate::middleware::reject_anonymous_users;
-use crate::routes::{callback, create_session, index, join, session_index, ws_connect};
+use crate::routes::{callback, create_session, index, logout, join, session_index, ws_connect};
 use crate::session_agent::SessionAgentRequest;
 use actix::Actor;
 use actix_files as fs;
@@ -27,7 +27,7 @@ impl Application {
         let hmac_secret = settings.application.hmac_secret;
         let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
         let redis_store = RedisSessionStore::new(settings.redis_uri.expose_secret()).await?;
-        let db = web::Data::new(Database::new(&settings.database));
+        let db = web::Data::new(Database::new(&settings.database, settings.spotify.clone()));
         let controller = Controller::new(agent_tx).start();
         let address = format!("127.0.0.1:{}", settings.application.port);
 
@@ -45,7 +45,8 @@ impl Application {
                     web::scope("/session")
                         .wrap(from_fn(reject_anonymous_users))
                         .route("/", web::get().to(session_index))
-                        .route("/ws", web::get().to(ws_connect)),
+                        .route("/ws", web::get().to(ws_connect))
+                        .route("/logout", web::get().to(logout))
                 )
                 .service(fs::Files::new("/static", "."))
                 .app_data(db.clone())

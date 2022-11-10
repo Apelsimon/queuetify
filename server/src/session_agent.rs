@@ -1,11 +1,10 @@
 use crate::configuration::Settings;
 use crate::controller;
 use crate::controller::messages::{
-    SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload,
+    KillComplete, SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload, 
 };
-use crate::controller::Controller;
+use crate::controller::{Controller, POLL_STATE_INTERVAL, REFRESH_TOKEN_INTERVAL};
 use crate::db::Database;
-use crate::spotify::get_spotify_from_db;
 use actix::Addr;
 use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::device::Device;
@@ -22,12 +21,16 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use uuid::Uuid;
 
+// TODO: kill session if db operations fail?
+
 pub enum SessionAgentRequest {
     Search((controller::Search, Addr<Controller>)),
     Queue((controller::Queue, Addr<Controller>)),
     GetState((Uuid, Option<Uuid>, Addr<Controller>)),
     PollState((Uuid, Addr<Controller>)),
-    Vote((controller::Vote, Addr<Controller>))
+    Vote((controller::Vote, Addr<Controller>)),
+    Refresh((Uuid, Addr<Controller>)),
+    Kill((Uuid, Addr<Controller>))
 }
 
 pub struct SessionAgent {
@@ -40,7 +43,7 @@ impl SessionAgent {
         let (tx, rx) = mpsc::unbounded_channel();
         let agent = Self {
             rx,
-            db: Database::new(&settings.database),
+            db: Database::new(&settings.database, settings.spotify),
         };
         (agent, tx)
     }
@@ -76,7 +79,7 @@ impl SessionAgent {
                     }
                 },
                 SessionAgentRequest::GetState((id, connection_id, addr)) => {
-                    let spotify = match get_spotify_from_db(id, &self.db).await {
+                    let spotify = match self.db.get_spotify(id).await {
                         Ok(spotify) => spotify,
                         Err(_) => continue,
                     };
@@ -110,6 +113,34 @@ impl SessionAgent {
                         },
                         Err(err) => {
                             log::error!("Error on vote {err}");
+                        }
+                    }
+                },
+                SessionAgentRequest::Refresh((id, addr)) => {
+                    match on_refresh(id, &self.db).await {
+                        Ok(()) => {
+                            addr.do_send(controller::Refresh {
+                                duration: REFRESH_TOKEN_INTERVAL,
+                                session_id: id
+                            })
+                        },
+                        Err(_) => {
+                            addr.do_send(controller::Refresh {
+                                duration: Duration::from_secs(10), //TODO: exponential backoff wait? kill session after some number of tries?
+                                session_id: id
+                            })
+                        }
+                    }
+                },
+                SessionAgentRequest::Kill((id, addr)) => {
+                    match self.db.delete_session(id).await {
+                        Ok(()) => {
+                            addr.do_send(KillComplete {
+                                session_id: id
+                            })
+                        },
+                        Err(err) => {
+                            log::error!("Error on kill {err}");
                         }
                     }
                 }
@@ -193,7 +224,7 @@ async fn get_search_results(
 }
 
 async fn on_search(msg: &controller::Search, db: &Database) -> Result<SearchResult, ()> {
-    if let Ok(spotify) = get_spotify_from_db(msg.session_id, &db).await {
+    if let Ok(spotify) = db.get_spotify(msg.session_id).await {
         if let Ok(search_result) = get_search_results(&spotify, &msg.query).await {
             return Ok(search_result);
         }
@@ -282,7 +313,7 @@ async fn get_current_state(
 }
 
 async fn on_queue(msg: controller::Queue, db: &Database) -> Result<StateUpdate, anyhow::Error> {
-    let spotify = get_spotify_from_db(msg.session_id, &db).await?;
+    let spotify = db.get_spotify(msg.session_id).await?;
 
     let (track, transaction) = db.get_current_track(msg.session_id).await?;
     match track {
@@ -302,11 +333,8 @@ async fn on_queue(msg: controller::Queue, db: &Database) -> Result<StateUpdate, 
     Ok(state)
 }
 
-pub const UPDATE_STATE_INTERVAL: Duration = Duration::from_secs(5);
-
 async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, anyhow::Error> {
-    log::info!("update state for {id}");
-    let spotify = get_spotify_from_db(id, &db).await?;
+    let spotify = db.get_spotify(id).await?;
     let (track, mut transaction) = db.get_current_track(id).await?;
     match track {
         Some(expected_playing_id) => {
@@ -323,7 +351,7 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                 if current_playing_context.is_playing {
                                     match current_playing_context.progress {
                                         Some(duration) => {
-                                            if (track.duration - duration) < UPDATE_STATE_INTERVAL {
+                                            if (track.duration - duration) < POLL_STATE_INTERVAL {
                                                 match db
                                                     .pop_track_from_queue(id, &mut transaction)
                                                     .await?
@@ -354,7 +382,7 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                             log::error!(
                                                 "Progress missing for current playing context!"
                                             );
-                                            todo!();
+                                            // TODO
                                         }
                                     }
                                 } else {
@@ -363,16 +391,16 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                             }
                         } else {
                             log::error!("Track id missing for actual currently playing track!");
-                            todo!();
+                            // TODO
                         }
                     }
                     Some(PlayableItem::Episode(_)) => {
                         log::error!("Actual current playing is episode");
-                        todo!()
+                        // TODO
                     }
                     None => {
                         log::error!("Actual current playing item is none");
-                        todo!();
+                        // TODO
                     }
                 },
                 None => {
@@ -384,14 +412,13 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
             log::info!("No current track"); // TODO: check queue?
         }
     }
-
     Ok(None)
 }
 
 async fn on_vote(msg: controller::Vote, db: &Database) -> Result<Option<StateUpdate>, anyhow::Error> {
     match db.add_vote(&msg).await {
         Ok(()) => {
-            let spotify = get_spotify_from_db(msg.session_id, &db).await?;
+            let spotify = db.get_spotify(msg.session_id).await?;
             let state = get_current_state(msg.session_id, None, &spotify, &db).await?;
             Ok(Some(state))
         },
@@ -399,5 +426,11 @@ async fn on_vote(msg: controller::Vote, db: &Database) -> Result<Option<StateUpd
             Ok(None)
         }
     }
-    
+}
+
+async fn on_refresh(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
+    let spotify = db.get_spotify(id).await?;
+    spotify.refresh_token().await?;
+    db.set_spotify(id, &spotify).await?;
+    Ok(())
 }

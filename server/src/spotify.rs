@@ -47,6 +47,11 @@ pub async fn get_token_string(spotify: &AuthCodeSpotify) -> Result<String, serde
     serde_json::to_string(&token)
 }
 
+pub fn create_token_from_string(token: &str) -> Result<Token, serde_json::Error> {
+    let token = serde_json::from_str::<Token>(token)?;
+    Ok(token)
+}
+
 pub fn from_token_string(token: &str) -> Result<AuthCodeSpotify, serde_json::Error> {
     let token = serde_json::from_str::<Token>(token)?;
     Ok(AuthCodeSpotify::from_token(token))
