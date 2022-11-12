@@ -5,13 +5,13 @@
   "private": "true",
   "scripts": {
     "start": "webpack serve --mode development --open",
-    "build": "webpack --env production",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "webpack --env production"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@fortawesome/fontawesome-free": "^6.2.0",
     "axios": "^1.1.2",
     "css-loader": "^6.7.1",
     "html-webpack-plugin": "^5.5.0",

@@ -19,6 +19,7 @@ pub struct Application {
     server: Server,
 }
 
+// TODO: redirect valid sessions away from non /session paths
 impl Application {
     pub async fn build(
         settings: Settings,

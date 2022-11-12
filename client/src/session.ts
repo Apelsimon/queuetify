@@ -1,5 +1,12 @@
 import useWebSocket from "./websocket"
 import "./css/base.css"
+import "./css/session.css"
+
+import '@fortawesome/fontawesome-free/js/fontawesome'
+import '@fortawesome/fontawesome-free/js/solid'
+import '@fortawesome/fontawesome-free/js/regular'
+import '@fortawesome/fontawesome-free/js/brands'
+
 
 interface TrackInfo {
     name: string;
@@ -14,6 +21,25 @@ interface SearchResults {
 interface StateUpdate {
     track: TrackInfo | null;
     queue: TrackInfo[];
+}
+
+enum Context {
+    Host,
+    Peer,
+    None
+}
+
+let context = Context.None
+
+switch(document.querySelector<HTMLParagraphElement>("#context").innerText) {
+    case "host": {
+        context = Context.Host
+        break
+    }
+    case "peer": {
+        context = Context.Peer
+        break
+    }
 }
 
 const logout = () => {
@@ -58,6 +84,49 @@ const onOpenCb = () => {
 }
 
 doConnect(onOpenCb)
+
+const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
+
+const closeIcon = document.createElement("i")
+closeIcon.classList.add("fa")
+closeIcon.classList.add("fa-times")
+closeIcon.ariaHidden = "true"
+
+const closeSettingsNavButton = document.createElement("button")
+closeSettingsNavButton.addEventListener("click", (ev) => {
+    ev.preventDefault()
+    settingsNav.style.width = "0" 
+})
+closeSettingsNavButton.appendChild(closeIcon)
+
+settingsNav.appendChild(closeSettingsNavButton)
+
+if (context == Context.Host) {
+    const endSessionButton = document.createElement("button")
+    endSessionButton.innerText = "End session"
+    endSessionButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        const killRequest = { type: "Kill"}
+        doSend(JSON.stringify(killRequest))
+    })
+    settingsNav.appendChild(endSessionButton)
+
+    const copyJoinUrlButton = document.createElement("button")
+    copyJoinUrlButton.innerText = "Copy URL"
+    copyJoinUrlButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        const sessionId = document.querySelector<HTMLButtonElement>("#session_id")
+        const { location } = window
+        const url = `${location.protocol}//${location.host}/join/${sessionId.innerText}`
+        console.log("Copy join url ", url)
+        
+        navigator.clipboard.writeText(url)
+    })
+    settingsNav.appendChild(copyJoinUrlButton)
+
+} else if (context == Context.Peer) {
+    
+}
 
 
 const queueTrack = (ev: MouseEvent, trackId: string) => {
@@ -121,16 +190,6 @@ searchButton.addEventListener("click", (ev) => {
     doSend(JSON.stringify(searchRequest))
 })
 
-const killSessionButton = document.querySelector<HTMLButtonElement>("#kill-session-btn")
-
-if (killSessionButton) {
-    killSessionButton.addEventListener("click", (ev) => {
-        ev.preventDefault()
-        const killRequest = { type: "Kill"}
-        doSend(JSON.stringify(killRequest))
-    })
-}
-
 
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout-btn")
 
@@ -141,3 +200,10 @@ if (logoutButton) {
         logout()
     })
 }
+
+const settingsButton = document.querySelector<HTMLButtonElement>("#settings-btn")
+settingsButton.addEventListener("click", (ev) => {
+    ev.preventDefault()
+    const settingsNav = document.querySelector<HTMLButtonElement>("#settings-nav")
+    settingsNav.style.width = "100%" 
+})
