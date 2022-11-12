@@ -15,12 +15,16 @@
     <button id="logout-btn">Logout</button>    
 {% endif %}    
 
-    <div class="search-container">
+    <div id="search-nav">
         <input id="search-input" type="text" placeholder="Search.." name="search">
         <button id="search-btn"><i class="fa fa-search"></i></button>
+        <button id="close-search-nav-btn"><i class="fa fa-times"></i></button>
+        <div id="search-results"></div>
     </div>
+
+    <button id="search-toggle"><i class="fa fa-search"></i></button>
     <button id="settings-btn"><i class="fa fa-cog" aria-hidden="true"></i></button>
-    <div id="search-results"></div>
+    
     <div id="track-queue"></div>
 
     <script src="/static/session.js"></script>

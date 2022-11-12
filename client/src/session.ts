@@ -128,11 +128,11 @@ if (context == Context.Host) {
     
 }
 
-
 const queueTrack = (ev: MouseEvent, trackId: string) => {
     console.log("Queue track ", trackId)
     const queueRequest = { type: "Queue", uri: trackId }
     doSend(JSON.stringify(queueRequest))
+    closeSearchNavButton.click()
 }
 
 const voteTrack = (ev: MouseEvent, trackId: string) => {
@@ -176,6 +176,13 @@ const createTrackList = (tracks: TrackInfo[], buttonText: string, onClickCb: (ev
 const searchResultsList = document.querySelector<HTMLDivElement>("#search-results")
 const trackQueue = document.querySelector<HTMLDivElement>("#track-queue")
 const searchInput = document.querySelector<HTMLInputElement>("#search-input")
+const searchNav = document.querySelector<HTMLButtonElement>("#search-nav")
+
+const searchToggle = document.querySelector<HTMLButtonElement>("#search-toggle")
+searchToggle.addEventListener("click", (ev) => {
+    ev.preventDefault()
+    searchNav.style.height = "100%"
+})
 
 const searchButton = document.querySelector<HTMLButtonElement>("#search-btn")
 searchButton.addEventListener("click", (ev) => {
@@ -190,6 +197,11 @@ searchButton.addEventListener("click", (ev) => {
     doSend(JSON.stringify(searchRequest))
 })
 
+const closeSearchNavButton = document.querySelector<HTMLButtonElement>("#close-search-nav-btn")
+closeSearchNavButton.addEventListener("click", (ev) => {
+    ev.preventDefault()
+    searchNav.style.height = "0"
+})
 
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout-btn")
 
