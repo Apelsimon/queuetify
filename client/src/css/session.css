@@ -8,6 +8,14 @@
     background-color: white;
     overflow-x: hidden;
     transition: 0.5s;
+
+    @apply flex flex-col space-y-1
+}
+
+#close-settings-nav-btn {
+    width: 15%;
+
+    @apply self-end
 }
 
 #search-nav {

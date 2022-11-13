@@ -92,14 +92,11 @@ closeIcon.classList.add("fa")
 closeIcon.classList.add("fa-times")
 closeIcon.ariaHidden = "true"
 
-const closeSettingsNavButton = document.createElement("button")
+const closeSettingsNavButton = document.querySelector<HTMLButtonElement>("#close-settings-nav-btn")
 closeSettingsNavButton.addEventListener("click", (ev) => {
     ev.preventDefault()
     settingsNav.style.width = "0" 
 })
-closeSettingsNavButton.appendChild(closeIcon)
-
-settingsNav.appendChild(closeSettingsNavButton)
 
 if (context == Context.Host) {
     const endSessionButton = document.createElement("button")

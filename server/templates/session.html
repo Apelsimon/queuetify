@@ -8,7 +8,9 @@
 </head>
 <body>
     <p id="context" hidden>{{context}}</p>
-    <div id="settings-nav"></div>
+    <div id="settings-nav">
+        <button id="close-settings-nav-btn"><i class="fa fa-times"></i></button>
+    </div>
 {% if context == "host" %}
     <p id="session_id" hidden>{{ session_id }}</p>
 {% elif context == "peer" %}
