@@ -139,7 +139,9 @@ const voteTrack = (ev: MouseEvent, trackId: string) => {
 }
 
 const createTrackListEntry = (info: TrackInfo, buttonText: string, onClickCb: (ev: MouseEvent, trackId: string) => void) => {
+
     var listEntry = document.createElement("li")
+    listEntry.className = "track-container"
     
     var paragraph = document.createElement("p")
     paragraph.textContent = info.name + " - " + info.artists

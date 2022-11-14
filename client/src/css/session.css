@@ -1,15 +1,6 @@
 #settings-nav {
-    height: 100%;
-    width: 0;
-    position: fixed;
-    z-index: 1;
-    top: 0;
-    right: 0;
-    background-color: white;
-    overflow-x: hidden;
-    transition: 0.5s;
-
-    @apply flex flex-col space-y-1
+    @apply flex flex-col space-y-1 h-full w-0 fixed z-10 
+    top-0 right-0 overflow-x-hidden duration-500 bg-slate-100
 }
 
 #close-settings-nav-btn {
@@ -19,13 +10,18 @@
 }
 
 #search-nav {
-    height: 0;
-    width: 100%;
-    position: fixed;
-    z-index: 1;
-    top: 0;
-    right: 0;
-    background-color: white;
-    overflow-x: hidden;
-    transition: 0.5s;
+    @apply flex flex-col space-y-1 h-0 w-full fixed z-10 
+    top-0 right-0 overflow-x-hidden duration-500 bg-slate-100
+}
+
+#search-ctl {
+    @apply flex flex-row space-x-1 p-1
+}
+
+#search-input {
+    @apply grow
+}
+
+.track-container {
+    @apply flex flex-row justify-between p-1
 }
