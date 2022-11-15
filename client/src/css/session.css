@@ -1,6 +1,10 @@
 #settings-nav {
-    @apply flex flex-col space-y-1 h-full w-0 fixed z-10 
-    top-0 right-0 overflow-x-hidden duration-500 bg-slate-100
+    @apply h-full w-0 fixed z-10 
+    top-0 right-0 overflow-x-hidden ease-in duration-500 bg-slate-100
+}
+
+#settings-nav-content {
+    @apply flex flex-col space-y-2 p-1
 }
 
 #close-settings-nav-btn {
@@ -11,7 +15,7 @@
 
 #search-nav {
     @apply flex flex-col space-y-1 h-0 w-full fixed z-10 
-    top-0 right-0 overflow-x-hidden duration-500 bg-slate-100
+    top-0 right-0 overflow-x-hidden ease-in duration-500 bg-slate-100
 }
 
 #search-ctl {
@@ -19,9 +23,25 @@
 }
 
 #search-input {
-    @apply grow
+    @apply grow rounded
 }
 
 .track-container {
     @apply flex flex-row justify-between p-1
+}
+
+#track-queue {
+    @apply flex flex-col space-y-1 pl-1
+}
+
+#toggle-btn-container {
+    @apply flex justify-end p-1 space-x-1
+}
+
+#current-track-container {
+    @apply flex justify-center p-4 space-x-4
+}
+
+#volume-icon {
+    @apply animate-ping animate-bounce
 }

@@ -61,9 +61,20 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             trackQueue.textContent = ""
 
             if (stateUpdate.track) {
-                var paragraph = document.createElement("p")
-                paragraph.textContent = "Current track: " + stateUpdate.track.name + " - " + stateUpdate.track.artists
-                trackQueue.appendChild(paragraph)
+                let currentTrackContainer = document.createElement("div")
+                currentTrackContainer.id = "current-track-container"
+                let paragraph = document.createElement("p")
+                paragraph.textContent = stateUpdate.track.name + " - " + stateUpdate.track.artists
+                currentTrackContainer.appendChild(paragraph)
+
+                let volumeIcon = document.createElement("i")
+                volumeIcon.classList.add("fa")
+                volumeIcon.classList.add("fa-volume-up")
+                volumeIcon.ariaHidden = "true"
+                volumeIcon.id = "volume-icon"
+                currentTrackContainer.appendChild(volumeIcon)
+
+                trackQueue.appendChild(currentTrackContainer)
             }
             
             trackQueue.appendChild(createTrackList(stateUpdate.queue, "Vote", voteTrack))
@@ -86,6 +97,7 @@ const onOpenCb = () => {
 doConnect(onOpenCb)
 
 const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
+const settingsNavContent = document.querySelector<HTMLDivElement>("#settings-nav-content")
 
 const closeIcon = document.createElement("i")
 closeIcon.classList.add("fa")
@@ -106,7 +118,7 @@ if (context == Context.Host) {
         const killRequest = { type: "Kill"}
         doSend(JSON.stringify(killRequest))
     })
-    settingsNav.appendChild(endSessionButton)
+    settingsNavContent.appendChild(endSessionButton)
 
     const copyJoinUrlButton = document.createElement("button")
     copyJoinUrlButton.innerText = "Copy URL"
@@ -119,10 +131,16 @@ if (context == Context.Host) {
         
         navigator.clipboard.writeText(url)
     })
-    settingsNav.appendChild(copyJoinUrlButton)
+    settingsNavContent.appendChild(copyJoinUrlButton)
 
 } else if (context == Context.Peer) {
-    
+    const exitSessionButton = document.createElement("button")
+    exitSessionButton.innerText = "Exit session"
+    exitSessionButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        logout()
+    })
+    settingsNavContent.appendChild(exitSessionButton)
 }
 
 const queueTrack = (ev: MouseEvent, trackId: string) => {
@@ -202,19 +220,9 @@ closeSearchNavButton.addEventListener("click", (ev) => {
     searchNav.style.height = "0"
 })
 
-const logoutButton = document.querySelector<HTMLButtonElement>("#logout-btn")
-
-if (logoutButton) {
-    logoutButton.addEventListener("click", (ev) => {
-        ev.preventDefault()
-        console.log("Do logout!")
-        logout()
-    })
-}
-
-const settingsButton = document.querySelector<HTMLButtonElement>("#settings-btn")
-settingsButton.addEventListener("click", (ev) => {
+const settingsToggle = document.querySelector<HTMLButtonElement>("#settings-toggle")
+settingsToggle.addEventListener("click", (ev) => {
     ev.preventDefault()
     const settingsNav = document.querySelector<HTMLButtonElement>("#settings-nav")
-    settingsNav.style.width = "100%" 
+    settingsNav.style.width = "100%"
 })

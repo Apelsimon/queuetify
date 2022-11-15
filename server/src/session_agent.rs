@@ -401,6 +401,7 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                     None => {
                         log::error!("Actual current playing item is none");
                         // TODO
+                        let _ = start_playback(&spotify, expected_playing_id).await?;
                     }
                 },
                 None => {

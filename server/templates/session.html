@@ -8,13 +8,9 @@
 </head>
 <body>
     <p id="context" hidden>{{context}}</p>
-    <div id="settings-nav">
-        <button id="close-settings-nav-btn"><i class="fa fa-times"></i></button>
-    </div>
+
 {% if context == "host" %}
     <p id="session_id" hidden>{{ session_id }}</p>
-{% elif context == "peer" %}
-    <button id="logout-btn">Logout</button>    
 {% endif %}    
 
     <div id="search-nav">
@@ -26,8 +22,16 @@
         <div id="search-results"></div>
     </div>
 
-    <button id="search-toggle"><i class="fa fa-search"></i></button>
-    <button id="settings-btn"><i class="fa fa-cog" aria-hidden="true"></i></button>
+    <div id="settings-nav">
+        <div id="settings-nav-content">
+            <button id="close-settings-nav-btn"><i class="fa fa-times"></i></button>
+        </div>        
+    </div>
+
+    <div id="toggle-btn-container">
+        <button id="search-toggle"><i class="fa fa-search"></i></button>
+        <button id="settings-toggle"><i class="fa fa-cog" aria-hidden="true"></i></button>
+    </div>
     
     <div id="track-queue"></div>
 
