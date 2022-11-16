@@ -1,7 +1,7 @@
 use crate::configuration::Settings;
 use crate::controller;
 use crate::controller::messages::{
-    KillComplete, SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload, 
+    DevicesComplete, DeviceInfo, KillComplete, SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload, 
 };
 use crate::controller::{Controller, POLL_STATE_INTERVAL, REFRESH_TOKEN_INTERVAL};
 use crate::db::Database;
@@ -30,7 +30,8 @@ pub enum SessionAgentRequest {
     PollState((Uuid, Addr<Controller>)),
     Vote((controller::Vote, Addr<Controller>)),
     Refresh((Uuid, Addr<Controller>)),
-    Kill((Uuid, Addr<Controller>))
+    Kill((Uuid, Addr<Controller>)),
+    Devices((controller::Devices, Addr<Controller>))
 }
 
 pub struct SessionAgent {
@@ -141,6 +142,21 @@ impl SessionAgent {
                         },
                         Err(err) => {
                             log::error!("Error on kill {err}");
+                        }
+                    }
+                },
+                // TODO: make endpoint of this instead
+                SessionAgentRequest::Devices((msg, addr)) => {
+                    let connection_id = msg.connection_id;
+                    match on_devices(msg, &self.db).await {
+                        Ok(devices) => {
+                            addr.do_send(DevicesComplete {
+                                connection_id,
+                                devices
+                            })
+                        },
+                        Err(err) => {
+                            log::error!("Error on devices {err}")
                         }
                     }
                 }
@@ -434,4 +450,22 @@ async fn on_refresh(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
     spotify.refresh_token().await?;
     db.set_spotify(id, &spotify).await?;
     Ok(())
+}
+
+async fn on_devices(msg: controller::Devices, db: &Database) -> Result<Vec<DeviceInfo>, anyhow::Error> {
+    let spotify = db.get_spotify(msg.session_id).await?;
+    let devices = spotify.device().await?;
+
+    let mut device_infos = Vec::new();
+
+    for device in devices.iter() {
+        let dev_info = match DeviceInfo::try_from(device.clone()) {
+            Ok(info) => info,
+            Err(_) => continue,
+        };
+
+        device_infos.push(dev_info);
+    }
+
+    Ok(device_infos)
 }

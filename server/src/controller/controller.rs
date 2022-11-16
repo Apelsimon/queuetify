@@ -1,5 +1,5 @@
 use crate::controller::messages::{
-    Connect, Disconnect, Kill, KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, Vote, WsMessage,
+    Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, Vote, WsMessage,
 };
 use crate::controller::messages::{Response};
 use crate::session_agent::{SessionAgentRequest};
@@ -202,5 +202,27 @@ impl Handler<KillComplete> for Controller {
                 self.send_message(shutdown.clone(), client);
             });
         }
+    }
+}
+
+impl Handler<Devices> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Devices, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::Devices((msg, ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::Devices, {err}");
+        }
+    }
+}
+
+impl Handler<DevicesComplete> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: DevicesComplete, ctx: &mut Context<Self>) -> Self::Result {
+        let response = Response::Devices(DevicesPayload {
+            payload: msg.devices
+        });
+        self.send_message(response, &msg.connection_id)
     }
 }

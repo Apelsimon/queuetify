@@ -1,6 +1,8 @@
 use crate::session_agent::{self, SearchResult};
 use actix::prelude::{Message, Recipient};
 use rspotify::model::TrackId;
+use rspotify::model::device::Device;
+use rspotify::model::enums::types::DeviceType;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::time::Duration;
@@ -15,6 +17,48 @@ pub struct StateUpdatePayload {
     pub payload: session_agent::State,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct DeviceInfo {
+    id: String,
+    name: String,
+    dev_type: String
+}
+
+impl TryFrom<Device> for DeviceInfo {
+    type Error = ();
+
+    fn try_from(device: Device) -> Result<Self, Self::Error> {
+        let id = match device.id {
+            Some(id) => id,
+            None => return Err(()),
+        };
+
+        Ok(DeviceInfo {
+            id,
+            name: device.name,
+            dev_type: device_type_to_string(device._type)
+        })
+    }
+}
+
+fn device_type_to_string(dev_type: DeviceType) -> String {
+    let result = match dev_type {
+        DeviceType::Computer => "Computer",
+        DeviceType::Tablet => "Tablet",
+        DeviceType::Smartphone => "Smartphone",
+        DeviceType::Speaker => "Speaker",
+        DeviceType::Tv => "Tv",
+        _ => "Unknown"
+    };
+
+    result.to_string()
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DevicesPayload {
+    pub payload: Vec<DeviceInfo>
+}
+
 // TODO: change name. not everything is a response
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
@@ -22,6 +66,7 @@ pub enum Response {
     SearchResult(SearchResultPayload),
     Shutdown,
     StateUpdate(StateUpdatePayload),
+    Devices(DevicesPayload)
 }
 
 #[derive(Message)]
@@ -105,4 +150,18 @@ pub struct Kill {
 #[rtype(result = "()")]
 pub struct KillComplete {
     pub session_id: Uuid,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Devices {
+    pub session_id: Uuid,
+    pub connection_id: Uuid,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct DevicesComplete {
+    pub connection_id: Uuid,
+    pub devices: Vec<DeviceInfo>,
 }

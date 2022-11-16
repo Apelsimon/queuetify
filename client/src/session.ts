@@ -50,11 +50,15 @@ const onMessageCb = (ev: MessageEvent<any>) => {
     let result = JSON.parse(ev.data)
 
     switch (result.type) {
+        case "Devices": {
+            console.log("got devices: ", result.payload)
+            break
+        }
         case "SearchResult": {
             let searchResults = result.payload as SearchResults
             searchResultsList.textContent = ""
             searchResultsList.appendChild(createTrackList(searchResults.tracks, "Add", queueTrack))
-            break;
+            break
         }
         case "StateUpdate": {
             let stateUpdate = result.payload as StateUpdate
@@ -79,7 +83,7 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             
             trackQueue.appendChild(createTrackList(stateUpdate.queue, "Vote", voteTrack))
             console.log("Receive state update: ", result.payload)
-            break;
+            break
         }
         case "Shutdown": {
             logout()
@@ -90,6 +94,9 @@ const onMessageCb = (ev: MessageEvent<any>) => {
 const { doConnect, doSend } = useWebSocket(onMessageCb)
 
 const onOpenCb = () => {
+    const devicesRequest = { type: "Devices" }
+    doSend(JSON.stringify(devicesRequest))
+
     const stateRequest = { type: "State" }
     doSend(JSON.stringify(stateRequest))
 }
@@ -110,7 +117,7 @@ closeSettingsNavButton.addEventListener("click", (ev) => {
     settingsNav.style.width = "0" 
 })
 
-if (context == Context.Host) {
+if (context === Context.Host) {
     const endSessionButton = document.createElement("button")
     endSessionButton.innerText = "End session"
     endSessionButton.addEventListener("click", (ev) => {
@@ -133,7 +140,7 @@ if (context == Context.Host) {
     })
     settingsNavContent.appendChild(copyJoinUrlButton)
 
-} else if (context == Context.Peer) {
+} else if (context === Context.Peer) {
     const exitSessionButton = document.createElement("button")
     exitSessionButton.innerText = "Exit session"
     exitSessionButton.addEventListener("click", (ev) => {
