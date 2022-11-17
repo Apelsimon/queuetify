@@ -108,8 +108,10 @@ const onMessageCb = (ev: MessageEvent<any>) => {
 const { doConnect, doSend } = useWebSocket(onMessageCb)
 
 const onOpenCb = () => {
-    const devicesRequest = { type: "Devices" }
-    doSend(JSON.stringify(devicesRequest))
+    if (context === Context.Host) {
+        const devicesRequest = { type: "Devices" }
+        doSend(JSON.stringify(devicesRequest))
+    }
 
     const stateRequest = { type: "State" }
     doSend(JSON.stringify(stateRequest))
@@ -280,8 +282,7 @@ const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
         let container = document.createElement("div")
         container.className = "device"
 
-        let p = document.createElement("p")
-        p.innerText = device.dev_type + " - " + device.name
+        const p = createDeviceParagraph(device)
 
         let button = document.createElement("button")
         button.innerText = "+"
@@ -304,4 +305,30 @@ const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
     }
 
     devicesNav.style.width = "100%"
+}
+
+const createDeviceParagraph = (device: DeviceInfo) => {
+    let p = document.createElement("p")
+    const icon = document.createElement("i")
+    icon.classList.add("fa")
+    icon.ariaHidden = "true"
+
+    if (device.dev_type === "Computer") {
+        icon.classList.add("fa-desktop")
+    } else if (device.dev_type === "Tablet") {
+        icon.classList.add("fa-tablet")
+    } else if (device.dev_type === "Smartphone") {
+        icon.classList.add("fa-mobile")
+    } else if (device.dev_type === "Speaker") {
+        icon.classList.add("fa-music")
+    } else if (device.dev_type === "Tv") {
+        icon.classList.add("fa-television")
+    } else {
+        icon.classList.add("fa-question")
+    }
+
+    p.appendChild(icon)
+    p.innerHTML += ("  " + device.name)
+
+    return p
 }
