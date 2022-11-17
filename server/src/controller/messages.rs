@@ -72,7 +72,7 @@ pub enum Response {
     Shutdown,
     StateUpdate(StateUpdatePayload),
     Devices(DevicesPayload),
-    TransferResponse(TransferResponsePayload)
+    Transfer(TransferResponsePayload)
 }
 
 #[derive(Message)]

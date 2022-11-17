@@ -244,7 +244,7 @@ impl Handler<TransferComplete> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: TransferComplete, ctx: &mut Context<Self>) -> Self::Result {
-        let response = Response::TransferResponse(TransferResponsePayload {
+        let response = Response::Transfer(TransferResponsePayload {
             payload: msg.result
         });
         self.send_message(response, &msg.connection_id)

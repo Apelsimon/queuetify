@@ -95,11 +95,10 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             logout()
             break
         }
-        case "TransferResponse": {
+        case "Transfer": {
             let resultCode = result.payload as string
 
             if (resultCode === "OK") {
-                console.log("Playback transfer successful!")
                 devicesNav.style.width = "0"
             }
         }
@@ -122,11 +121,6 @@ const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
 const settingsNavContent = document.querySelector<HTMLDivElement>("#settings-nav-content")
 const devicesNav = document.querySelector<HTMLDivElement>("#devices-nav")
 
-const closeIcon = document.createElement("i")
-closeIcon.classList.add("fa")
-closeIcon.classList.add("fa-times")
-closeIcon.ariaHidden = "true"
-
 const closeSettingsNavButton = document.querySelector<HTMLButtonElement>("#close-settings-nav-btn")
 closeSettingsNavButton.addEventListener("click", (ev) => {
     ev.preventDefault()
@@ -134,15 +128,6 @@ closeSettingsNavButton.addEventListener("click", (ev) => {
 })
 
 if (context === Context.Host) {
-    const endSessionButton = document.createElement("button")
-    endSessionButton.innerText = "End session"
-    endSessionButton.addEventListener("click", (ev) => {
-        ev.preventDefault()
-        const killRequest = { type: "Kill"}
-        doSend(JSON.stringify(killRequest))
-    })
-    settingsNavContent.appendChild(endSessionButton)
-
     const copyJoinUrlButton = document.createElement("button")
     copyJoinUrlButton.innerText = "Copy URL"
     copyJoinUrlButton.addEventListener("click", (ev) => {
@@ -155,6 +140,26 @@ if (context === Context.Host) {
         navigator.clipboard.writeText(url)
     })
     settingsNavContent.appendChild(copyJoinUrlButton)
+
+    const devicesButton = document.createElement("button")
+    devicesButton.innerText = "Devices"
+    devicesButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        const devicesRequest = { type: "Devices" }
+        doSend(JSON.stringify(devicesRequest))
+        settingsNav.style.width = "0"
+    })
+    settingsNavContent.appendChild(devicesButton)
+
+    const endSessionButton = document.createElement("button")
+    endSessionButton.innerText = "End session"
+    endSessionButton.id = "end-session-btn"
+    endSessionButton.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        const killRequest = { type: "Kill"}
+        doSend(JSON.stringify(killRequest))
+    })
+    settingsNavContent.appendChild(endSessionButton)
 
 } else if (context === Context.Peer) {
     const exitSessionButton = document.createElement("button")
@@ -253,6 +258,20 @@ settingsToggle.addEventListener("click", (ev) => {
 const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
     devicesNav.innerText = ""
     
+    const closeDevicesNavButton = document.createElement("button")
+    closeDevicesNavButton.id = "close-devices-nav-btn"
+    closeDevicesNavButton.addEventListener("click", (ev) => {
+        devicesNav.style.width = "0"
+    })
+
+    const closeIcon = document.createElement("i")
+    closeIcon.classList.add("fa")
+    closeIcon.classList.add("fa-times")
+    closeIcon.ariaHidden = "true"
+    closeDevicesNavButton.appendChild(closeIcon)
+
+    devicesNav.appendChild(closeDevicesNavButton)
+
     let p = document.createElement("p")
     p.innerText = "Select playback device"
     devicesNav.appendChild(p)

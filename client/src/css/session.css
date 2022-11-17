@@ -55,3 +55,13 @@
 .device {
     @apply flex flex-row space-x-1 p-4 justify-between
 }
+
+#end-session-btn {
+    @apply bg-red-600 text-white
+}
+
+#close-devices-nav-btn {
+    width: 15%;
+
+    @apply self-end m-1
+}
