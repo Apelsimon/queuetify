@@ -7,6 +7,11 @@ import '@fortawesome/fontawesome-free/js/solid'
 import '@fortawesome/fontawesome-free/js/regular'
 import '@fortawesome/fontawesome-free/js/brands'
 
+interface DeviceInfo {
+    id: string;
+    name: string;
+    dev_type: string;
+}
 
 interface TrackInfo {
     name: string;
@@ -51,7 +56,8 @@ const onMessageCb = (ev: MessageEvent<any>) => {
 
     switch (result.type) {
         case "Devices": {
-            console.log("got devices: ", result.payload)
+            let devices = result.payload as DeviceInfo[]
+            populateAndDisplayDevicesNav(devices)
             break
         }
         case "SearchResult": {
@@ -87,6 +93,15 @@ const onMessageCb = (ev: MessageEvent<any>) => {
         }
         case "Shutdown": {
             logout()
+            break
+        }
+        case "TransferResponse": {
+            let resultCode = result.payload as string
+
+            if (resultCode === "OK") {
+                console.log("Playback transfer successful!")
+                devicesNav.style.width = "0"
+            }
         }
     }
 }
@@ -105,6 +120,7 @@ doConnect(onOpenCb)
 
 const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
 const settingsNavContent = document.querySelector<HTMLDivElement>("#settings-nav-content")
+const devicesNav = document.querySelector<HTMLDivElement>("#devices-nav")
 
 const closeIcon = document.createElement("i")
 closeIcon.classList.add("fa")
@@ -233,3 +249,40 @@ settingsToggle.addEventListener("click", (ev) => {
     const settingsNav = document.querySelector<HTMLButtonElement>("#settings-nav")
     settingsNav.style.width = "100%"
 })
+
+const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
+    devicesNav.innerText = ""
+    
+    let p = document.createElement("p")
+    p.innerText = "Select playback device"
+    devicesNav.appendChild(p)
+
+    for (const device of devices) {
+        let container = document.createElement("div")
+        container.className = "device"
+
+        let p = document.createElement("p")
+        p.innerText = device.dev_type + " - " + device.name
+
+        let button = document.createElement("button")
+        button.innerText = "+"
+
+        const callback = (ev: MouseEvent, deviceId: string) => {
+            ev.preventDefault()
+            console.log("Transfer to device with id ", deviceId)
+            const transferRequest = { type: "Transfer", device_id: deviceId }
+            doSend(JSON.stringify(transferRequest))
+        }
+        const swap = function (deviceId: string, ev: MouseEvent) {
+            return this(ev, deviceId);
+        }
+        
+        button.addEventListener("click", swap.bind(callback, device.id))
+
+        container.appendChild(p)
+        container.appendChild(button)
+        devicesNav.appendChild(container)
+    }
+
+    devicesNav.style.width = "100%"
+}

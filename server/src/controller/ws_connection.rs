@@ -1,6 +1,6 @@
 use crate::controller::controller::Controller;
 use crate::controller::messages::{Connect, Devices, Disconnect, Kill, Queue, 
-    Search, State,Vote, WsMessage};
+    Search, State, Transfer, Vote, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -100,6 +100,11 @@ struct VotePayload {
 }
 
 #[derive(Serialize, Deserialize)]
+struct TransferPayload {
+    device_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum Request {
     Search(SearchPayload),
@@ -107,7 +112,8 @@ enum Request {
     State,
     Vote(VotePayload),
     Kill,
-    Devices
+    Devices,
+    Transfer(TransferPayload)
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
@@ -169,6 +175,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                             self.controller_addr.do_send(Devices {
                                 session_id: self.session_id,
                                 connection_id: self.connection_id
+                            })
+                        },
+                        Request::Transfer(t) => {
+                            self.controller_addr.do_send(Transfer {
+                                session_id: self.session_id,
+                                connection_id: self.connection_id,
+                                device_id: t.device_id
                             })
                         }
                     }

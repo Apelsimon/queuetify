@@ -1,7 +1,8 @@
 use crate::configuration::Settings;
 use crate::controller;
 use crate::controller::messages::{
-    DevicesComplete, DeviceInfo, KillComplete, SearchComplete, SearchResultPayload, StateUpdate, StateUpdatePayload, 
+    DevicesComplete, DeviceInfo, KillComplete, SearchComplete, 
+    SearchResultPayload, StateUpdate, StateUpdatePayload, TransferComplete
 };
 use crate::controller::{Controller, POLL_STATE_INTERVAL, REFRESH_TOKEN_INTERVAL};
 use crate::db::Database;
@@ -31,7 +32,8 @@ pub enum SessionAgentRequest {
     Vote((controller::Vote, Addr<Controller>)),
     Refresh((Uuid, Addr<Controller>)),
     Kill((Uuid, Addr<Controller>)),
-    Devices((controller::Devices, Addr<Controller>))
+    Devices((controller::Devices, Addr<Controller>)),
+    Transfer((controller::Transfer, Addr<Controller>))
 }
 
 pub struct SessionAgent {
@@ -159,6 +161,23 @@ impl SessionAgent {
                             log::error!("Error on devices {err}")
                         }
                     }
+                },
+                SessionAgentRequest::Transfer((msg, addr)) => {
+                    let connection_id = msg.connection_id;
+                    match on_transfer(msg, &self.db).await {
+                        Ok(()) => {
+                            addr.do_send(TransferComplete {
+                                connection_id,
+                                result: "OK".to_string()
+                            })
+                        },
+                        Err(_) => {
+                            addr.do_send(TransferComplete {
+                                connection_id,
+                                result: "Err".to_string()
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -249,32 +268,12 @@ async fn on_search(msg: &controller::Search, db: &Database) -> Result<SearchResu
     Err(())
 }
 
-//TODO: should be removed when device is selectable
-async fn get_device(spotify: &AuthCodeSpotify) -> Result<Device, anyhow::Error> {
-    match spotify.device().await {
-        Ok(devices) => {
-            for device in devices.into_iter() {
-                if device._type == DeviceType::Computer {
-                    return Ok(device);
-                }
-            }
-        }
-        Err(err) => {
-            log::error!("Failed to fetch devices {err}");
-        }
-    }
-
-    Err(anyhow::Error::msg("No computer device found"))
-}
-
 async fn start_playback(spotify: &AuthCodeSpotify, id: TrackId) -> Result<(), anyhow::Error> {
-    // TODO: make device selectable when session is created/started
-    let device = get_device(&spotify).await?;
     let uri: Box<dyn PlayableId> = Box::new(id);
     spotify
         .start_uris_playback(
             Some(uri.as_ref()),
-            Some(device.id.as_deref().unwrap_or("")),
+            None,
             None,
             None,
         )
@@ -468,4 +467,10 @@ async fn on_devices(msg: controller::Devices, db: &Database) -> Result<Vec<Devic
     }
 
     Ok(device_infos)
+}
+
+async fn on_transfer(msg: controller::Transfer, db: &Database) -> Result<(), anyhow::Error> {
+    let spotify = db.get_spotify(msg.session_id).await?;
+    spotify.transfer_playback(&msg.device_id, Some(false)).await?;
+    Ok(())
 }

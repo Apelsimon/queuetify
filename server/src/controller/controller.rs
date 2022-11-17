@@ -1,5 +1,7 @@
 use crate::controller::messages::{
-    Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, Vote, WsMessage,
+    Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, 
+    KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, 
+    Transfer, TransferComplete, TransferResponsePayload, Vote, WsMessage,
 };
 use crate::controller::messages::{Response};
 use crate::session_agent::{SessionAgentRequest};
@@ -222,6 +224,28 @@ impl Handler<DevicesComplete> for Controller {
     fn handle(&mut self, msg: DevicesComplete, ctx: &mut Context<Self>) -> Self::Result {
         let response = Response::Devices(DevicesPayload {
             payload: msg.devices
+        });
+        self.send_message(response, &msg.connection_id)
+    }
+}
+
+impl Handler<Transfer> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: Transfer, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::Transfer((msg, ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::Transfer, {err}");
+        }
+    }
+}
+
+impl Handler<TransferComplete> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: TransferComplete, ctx: &mut Context<Self>) -> Self::Result {
+        let response = Response::TransferResponse(TransferResponsePayload {
+            payload: msg.result
         });
         self.send_message(response, &msg.connection_id)
     }

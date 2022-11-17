@@ -59,6 +59,11 @@ pub struct DevicesPayload {
     pub payload: Vec<DeviceInfo>
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TransferResponsePayload {
+    pub payload: String
+}
+
 // TODO: change name. not everything is a response
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
@@ -66,7 +71,8 @@ pub enum Response {
     SearchResult(SearchResultPayload),
     Shutdown,
     StateUpdate(StateUpdatePayload),
-    Devices(DevicesPayload)
+    Devices(DevicesPayload),
+    TransferResponse(TransferResponsePayload)
 }
 
 #[derive(Message)]
@@ -164,4 +170,19 @@ pub struct Devices {
 pub struct DevicesComplete {
     pub connection_id: Uuid,
     pub devices: Vec<DeviceInfo>,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Transfer {
+    pub session_id: Uuid,
+    pub connection_id: Uuid,
+    pub device_id: String
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct TransferComplete {
+    pub connection_id: Uuid,
+    pub result: String
 }
