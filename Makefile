@@ -36,10 +36,10 @@ server:
 	cp .env* ${OUTPUT_DIR}
 
 postgres:
-	./init_db.sh
+	./scripts/init_db.sh
 
 redis:
-	./init_redis.sh
+	./scripts/init_redis.sh
 
-serve:
+serve: postgres redis
 	cd build; ./server
