@@ -30,7 +30,7 @@ impl Application {
         let redis_store = RedisSessionStore::new(settings.redis_uri.expose_secret()).await?;
         let db = web::Data::new(Database::new(&settings.database, settings.spotify.clone()));
         let controller = Controller::new(agent_tx).start();
-        let address = format!("127.0.0.1:{}", settings.application.port);
+        let address = format!("0.0.0.0:{}", settings.application.port);
 
         let server = HttpServer::new(move || {
             App::new()
