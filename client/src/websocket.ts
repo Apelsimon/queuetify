@@ -1,5 +1,6 @@
-    
-let socket: WebSocket = null;
+import ReconnectingWebSocket from 'reconnecting-websocket';
+
+let socket: ReconnectingWebSocket = null;
 
 const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => void) =>  {
     doDisconnect()
@@ -10,7 +11,7 @@ const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => vo
     const wsUri = `${proto}://${location.host}/session/ws`
 
     console.log('Connecting...')
-    socket = new WebSocket(wsUri)
+    socket = new ReconnectingWebSocket(wsUri)
 
     socket.onopen = () => {
       console.log('Connected')
@@ -21,7 +22,6 @@ const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => vo
 
     socket.onclose = () => {
       console.log('Disconnected')
-      socket = null
     }
 }
 

@@ -4,7 +4,7 @@ ROOT=$(shell git rev-parse --show-toplevel)
 OUTPUT_DIR=${ROOT}/build
 TEMPLATE_DIR=${OUTPUT_DIR}/templates
 
-.PHONY: all clean init build client server
+.PHONY: all clean init build client run server
 
 all: clean init build
 
@@ -40,6 +40,9 @@ postgres:
 
 redis:
 	./scripts/init_redis.sh
+
+run:
+	cd build; ./server
 
 serve: postgres redis
 	cd build; ./server
