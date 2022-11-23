@@ -343,6 +343,25 @@ impl Database {
         *spotify.token.lock().await.unwrap() = Some(token);
         Ok(spotify)
     }
+
+    pub async fn voted_tracks(&self, id: Uuid, client_id: Uuid) -> Result<Vec<String>, sqlx::Error> {
+        let uris: Vec<(String,)> = sqlx::query_as(
+            r#"
+                    SELECT track_uri FROM votes where session_id = $1 and client_id = $2
+                "#,
+        )
+        .bind(id)
+        .bind(client_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut voted_tracks = Vec::new();
+        for (uri,) in uris.iter() {
+            voted_tracks.push(uri.clone());
+        }
+
+        Ok(voted_tracks)
+    }
 }
 
 fn get_connection_pool(settings: &DatabaseSettings) -> PgPool {

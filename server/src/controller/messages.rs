@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::time::Duration;
 
+// TODO: make struct generic
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SearchResultPayload {
     pub payload: SearchResult,
@@ -64,6 +65,11 @@ pub struct TransferResponsePayload {
     pub payload: String
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct VotedTracksPayload {
+    pub payload: Vec<String>
+}
+
 // TODO: change name. not everything is a response
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
@@ -72,7 +78,8 @@ pub enum Response {
     Shutdown,
     StateUpdate(StateUpdatePayload),
     Devices(DevicesPayload),
-    Transfer(TransferResponsePayload)
+    Transfer(TransferResponsePayload),
+    VotedTracks(VotedTracksPayload)
 }
 
 #[derive(Message)]
@@ -185,4 +192,18 @@ pub struct Transfer {
 pub struct TransferComplete {
     pub connection_id: Uuid,
     pub result: String
+}
+
+#[derive(Clone, Message)]
+#[rtype(result = "()")]
+pub struct VotedTracks {
+    pub session_id: Uuid,
+    pub connection_id: Uuid,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct VotedTracksComplete {
+    pub connection_id: Uuid,
+    pub tracks: Vec<String>
 }

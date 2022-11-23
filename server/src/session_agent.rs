@@ -2,15 +2,13 @@ use crate::configuration::Settings;
 use crate::controller;
 use crate::controller::messages::{
     DevicesComplete, DeviceInfo, KillComplete, SearchComplete, 
-    SearchResultPayload, StateUpdate, StateUpdatePayload, TransferComplete
+    SearchResultPayload, StateUpdate, StateUpdatePayload, TransferComplete, VotedTracksComplete
 };
 use crate::controller::{Controller, POLL_STATE_INTERVAL, REFRESH_TOKEN_INTERVAL};
 use crate::db::Database;
 use actix::Addr;
 use rspotify::clients::{BaseClient, OAuthClient};
-use rspotify::model::device::Device;
 use rspotify::model::enums::misc::Market;
-use rspotify::model::enums::types::DeviceType;
 use rspotify::model::{AdditionalType, PlayableId, PlayableItem, SimplifiedArtist};
 use rspotify::model::{FullTrack, TrackId};
 use rspotify::model::{SearchResult::Tracks, SearchType};
@@ -33,7 +31,8 @@ pub enum SessionAgentRequest {
     Refresh((Uuid, Addr<Controller>)),
     Kill((Uuid, Addr<Controller>)),
     Devices((controller::Devices, Addr<Controller>)),
-    Transfer((controller::Transfer, Addr<Controller>))
+    Transfer((controller::Transfer, Addr<Controller>)),
+    VotedTracks((controller::VotedTracks, Addr<Controller>))
 }
 
 pub struct SessionAgent {
@@ -176,6 +175,19 @@ impl SessionAgent {
                                 connection_id,
                                 result: "Err".to_string()
                             })
+                        }
+                    }
+                },
+                SessionAgentRequest::VotedTracks((msg, addr)) => {
+                    match on_voted_tracks(msg.clone(), &self.db).await {
+                        Ok(tracks) => {
+                            addr.do_send(VotedTracksComplete {
+                                connection_id: msg.connection_id,
+                                tracks
+                            })
+                        },
+                        Err(err) => {
+                            log::error!("Error on devices {err}");
                         }
                     }
                 }
@@ -473,4 +485,9 @@ async fn on_transfer(msg: controller::Transfer, db: &Database) -> Result<(), any
     let spotify = db.get_spotify(msg.session_id).await?;
     spotify.transfer_playback(&msg.device_id, Some(false)).await?;
     Ok(())
+}
+
+async fn on_voted_tracks(msg: controller::VotedTracks, db: &Database) -> Result<Vec<String>, anyhow::Error> {
+    let voted_tracks = db.voted_tracks(msg.session_id, msg.connection_id).await?;
+    Ok(voted_tracks)
 }

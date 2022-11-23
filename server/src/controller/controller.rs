@@ -1,7 +1,7 @@
 use crate::controller::messages::{
     Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, 
     KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, 
-    Transfer, TransferComplete, TransferResponsePayload, Vote, WsMessage,
+    Transfer, TransferComplete, TransferResponsePayload, Vote, VotedTracks, VotedTracksComplete, VotedTracksPayload, WsMessage,
 };
 use crate::controller::messages::{Response};
 use crate::session_agent::{SessionAgentRequest};
@@ -246,6 +246,28 @@ impl Handler<TransferComplete> for Controller {
     fn handle(&mut self, msg: TransferComplete, ctx: &mut Context<Self>) -> Self::Result {
         let response = Response::Transfer(TransferResponsePayload {
             payload: msg.result
+        });
+        self.send_message(response, &msg.connection_id)
+    }
+}
+
+impl Handler<VotedTracks> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: VotedTracks, ctx: &mut Context<Self>) -> Self::Result {
+        let request = SessionAgentRequest::VotedTracks((msg, ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::VotedTracks, {err}");
+        }
+    }
+}
+
+impl Handler<VotedTracksComplete> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: VotedTracksComplete, ctx: &mut Context<Self>) -> Self::Result {
+        let response = Response::VotedTracks(VotedTracksPayload {
+            payload: msg.tracks
         });
         self.send_message(response, &msg.connection_id)
     }

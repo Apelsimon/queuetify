@@ -1,6 +1,6 @@
 use crate::controller::controller::Controller;
 use crate::controller::messages::{Connect, Devices, Disconnect, Kill, Queue, 
-    Search, State, Transfer, Vote, WsMessage};
+    Search, State, Transfer, Vote, VotedTracks, WsMessage};
 use actix::ActorFutureExt;
 use actix::{fut, ActorContext};
 use actix::{Actor, Addr, ContextFutureSpawner, Running, StreamHandler, WrapFuture};
@@ -113,7 +113,8 @@ enum Request {
     Vote(VotePayload),
     Kill,
     Devices,
-    Transfer(TransferPayload)
+    Transfer(TransferPayload),
+    VotedTracks
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
@@ -182,6 +183,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                                 session_id: self.session_id,
                                 connection_id: self.connection_id,
                                 device_id: t.device_id
+                            })
+                        },
+                        Request::VotedTracks => {
+                            self.controller_addr.do_send( VotedTracks {
+                                session_id: self.session_id,
+                                connection_id: self.connection_id
                             })
                         }
                     }

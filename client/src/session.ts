@@ -51,6 +51,8 @@ const logout = () => {
     window.location.href = "/session/logout"
 }
 
+let votedTracksCache: string[] = [];
+
 const onMessageCb = (ev: MessageEvent<any>) => {
     let result = JSON.parse(ev.data)
 
@@ -88,7 +90,9 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             }
             
             trackQueue.appendChild(createTrackList(stateUpdate.queue, "Vote", voteTrack))
-            console.log("Receive state update: ", result.payload)
+            
+            const votedTracksRequest = { type: "VotedTracks" }
+            doSend(JSON.stringify(votedTracksRequest))
             break
         }
         case "Shutdown": {
@@ -101,6 +105,13 @@ const onMessageCb = (ev: MessageEvent<any>) => {
             if (resultCode === "OK") {
                 devicesNav.style.width = "0"
             }
+
+            break
+        }
+        case "VotedTracks": {
+            votedTracksCache = result.payload as string[]
+            disableVotingForTracks(votedTracksCache)
+            break
         }
     }
 }
@@ -205,6 +216,13 @@ const createTrackListEntry = (info: TrackInfo, buttonText: string, onClickCb: (e
     var button = document.createElement("button")
     button.innerText = buttonText
     button.addEventListener("click", swap.bind(callback, info.id))
+    button.id = info.id
+
+    if (votedTracksCache.includes(info.id)) {
+        button.className = "voted-btn"
+        button.disabled = true
+    }
+
     listEntry.appendChild(button)
 
     return listEntry
@@ -331,4 +349,17 @@ const createDeviceParagraph = (device: DeviceInfo) => {
     p.innerHTML += ("  " + device.name)
 
     return p
+}
+
+const disableVotingForTracks = (tracks: string[]) => {
+    const trackList = trackQueue.getElementsByTagName("ul")
+    if (trackList && trackList.length > 0) {
+        for (const li of Array.from(trackList[0].children)) {
+            const button = li.getElementsByTagName("button")[0];
+            if (tracks.includes(button.id)) {
+                button.disabled = true
+                button.className = "voted-btn"
+            }
+        }
+    }
 }
