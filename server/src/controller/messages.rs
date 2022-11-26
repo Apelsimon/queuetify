@@ -1,11 +1,11 @@
 use crate::session_agent::{self, SearchResult};
 use actix::prelude::{Message, Recipient};
-use rspotify::model::TrackId;
 use rspotify::model::device::Device;
 use rspotify::model::enums::types::DeviceType;
+use rspotify::model::TrackId;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::time::Duration;
+use uuid::Uuid;
 
 // TODO: make struct generic
 #[derive(Serialize, Deserialize, Clone)]
@@ -22,7 +22,7 @@ pub struct StateUpdatePayload {
 pub struct DeviceInfo {
     id: String,
     name: String,
-    dev_type: String
+    dev_type: String,
 }
 
 impl TryFrom<Device> for DeviceInfo {
@@ -37,7 +37,7 @@ impl TryFrom<Device> for DeviceInfo {
         Ok(DeviceInfo {
             id,
             name: device.name,
-            dev_type: device_type_to_string(device._type)
+            dev_type: device_type_to_string(device._type),
         })
     }
 }
@@ -49,7 +49,7 @@ fn device_type_to_string(dev_type: DeviceType) -> String {
         DeviceType::Smartphone => "Smartphone",
         DeviceType::Speaker => "Speaker",
         DeviceType::Tv => "Tv",
-        _ => "Unknown"
+        _ => "Unknown",
     };
 
     result.to_string()
@@ -57,17 +57,17 @@ fn device_type_to_string(dev_type: DeviceType) -> String {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DevicesPayload {
-    pub payload: Vec<DeviceInfo>
+    pub payload: Vec<DeviceInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TransferResponsePayload {
-    pub payload: String
+    pub payload: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct VotedTracksPayload {
-    pub payload: Vec<String>
+    pub payload: Vec<String>,
 }
 
 // TODO: change name. not everything is a response
@@ -79,7 +79,7 @@ pub enum Response {
     StateUpdate(StateUpdatePayload),
     Devices(DevicesPayload),
     Transfer(TransferResponsePayload),
-    VotedTracks(VotedTracksPayload)
+    VotedTracks(VotedTracksPayload),
 }
 
 #[derive(Message)]
@@ -127,7 +127,7 @@ pub struct Queue {
 #[rtype(result = "()")]
 pub struct State {
     pub session_id: Uuid,
-    pub connection_id: Uuid
+    pub connection_id: Uuid,
 }
 
 #[derive(Message)]
@@ -143,7 +143,7 @@ pub struct Vote {
 pub struct StateUpdate {
     pub update: StateUpdatePayload,
     pub session_id: Uuid,
-    pub connection_id: Option<Uuid>
+    pub connection_id: Option<Uuid>,
 }
 
 #[derive(Message)]
@@ -184,14 +184,14 @@ pub struct DevicesComplete {
 pub struct Transfer {
     pub session_id: Uuid,
     pub connection_id: Uuid,
-    pub device_id: String
+    pub device_id: String,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct TransferComplete {
     pub connection_id: Uuid,
-    pub result: String
+    pub result: String,
 }
 
 #[derive(Clone, Message)]
@@ -205,5 +205,5 @@ pub struct VotedTracks {
 #[rtype(result = "()")]
 pub struct VotedTracksComplete {
     pub connection_id: Uuid,
-    pub tracks: Vec<String>
+    pub tracks: Vec<String>,
 }

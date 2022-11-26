@@ -1,16 +1,16 @@
+use crate::controller::messages::Response;
 use crate::controller::messages::{
-    Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, 
-    KillComplete, Queue, Refresh, Search, SearchComplete, State, StateUpdate, 
-    Transfer, TransferComplete, TransferResponsePayload, Vote, VotedTracks, VotedTracksComplete, VotedTracksPayload, WsMessage,
+    Connect, Devices, DevicesComplete, DevicesPayload, Disconnect, Kill, KillComplete, Queue,
+    Refresh, Search, SearchComplete, State, StateUpdate, Transfer, TransferComplete,
+    TransferResponsePayload, Vote, VotedTracks, VotedTracksComplete, VotedTracksPayload, WsMessage,
 };
-use crate::controller::messages::{Response};
-use crate::session_agent::{SessionAgentRequest};
+use crate::session_agent::SessionAgentRequest;
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::AsyncContext;
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
-use std::time::Duration;
 
 type Socket = Recipient<WsMessage>;
 
@@ -90,9 +90,9 @@ impl Handler<Connect> for Controller {
         // store the address
         self.clients.insert(msg.connection_id, msg.client_addr);
 
-        ctx.address().do_send(Refresh{
-            duration: Duration::from_secs(1)/*REFRESH_TOKEN_INTERVAL*/,
-            session_id: msg.session_id
+        ctx.address().do_send(Refresh {
+            duration: Duration::from_secs(1), /*REFRESH_TOKEN_INTERVAL*/
+            session_id: msg.session_id,
         });
     }
 }
@@ -132,10 +132,11 @@ impl Handler<State> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: State, ctx: &mut Context<Self>) -> Self::Result {
-        let request = SessionAgentRequest::GetState((msg.session_id, Some(msg.connection_id), ctx.address()));
-            if let Err(err) = self.agent_tx.send(request) {
-                log::error!("Failed to send SessionAgentRequest::GetState, {err}");
-            }
+        let request =
+            SessionAgentRequest::GetState((msg.session_id, Some(msg.connection_id), ctx.address()));
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::GetState, {err}");
+        }
     }
 }
 
@@ -144,9 +145,9 @@ impl Handler<Vote> for Controller {
 
     fn handle(&mut self, msg: Vote, ctx: &mut Context<Self>) -> Self::Result {
         let request = SessionAgentRequest::Vote((msg, ctx.address()));
-            if let Err(err) = self.agent_tx.send(request) {
-                log::error!("Failed to send SessionAgentRequest::GetState, {err}");
-            }
+        if let Err(err) = self.agent_tx.send(request) {
+            log::error!("Failed to send SessionAgentRequest::GetState, {err}");
+        }
     }
 }
 
@@ -179,7 +180,7 @@ impl Handler<Refresh> for Controller {
             if let Err(err) = actor.agent_tx.send(request) {
                 log::error!("Failed to send SessionAgentRequest::Refresh, {err}");
             }
-        });        
+        });
     }
 }
 
@@ -200,7 +201,7 @@ impl Handler<KillComplete> for Controller {
     fn handle(&mut self, msg: KillComplete, _ctx: &mut Context<Self>) -> Self::Result {
         if let Some(session) = self.sessions.get(&msg.session_id) {
             let shutdown = Response::Shutdown;
-            session.iter().for_each(|client| { 
+            session.iter().for_each(|client| {
                 self.send_message(shutdown.clone(), client);
             });
         }
@@ -221,9 +222,9 @@ impl Handler<Devices> for Controller {
 impl Handler<DevicesComplete> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: DevicesComplete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: DevicesComplete, _ctx: &mut Context<Self>) -> Self::Result {
         let response = Response::Devices(DevicesPayload {
-            payload: msg.devices
+            payload: msg.devices,
         });
         self.send_message(response, &msg.connection_id)
     }
@@ -243,9 +244,9 @@ impl Handler<Transfer> for Controller {
 impl Handler<TransferComplete> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: TransferComplete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: TransferComplete, _ctx: &mut Context<Self>) -> Self::Result {
         let response = Response::Transfer(TransferResponsePayload {
-            payload: msg.result
+            payload: msg.result,
         });
         self.send_message(response, &msg.connection_id)
     }
@@ -265,9 +266,9 @@ impl Handler<VotedTracks> for Controller {
 impl Handler<VotedTracksComplete> for Controller {
     type Result = ();
 
-    fn handle(&mut self, msg: VotedTracksComplete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: VotedTracksComplete, _ctx: &mut Context<Self>) -> Self::Result {
         let response = Response::VotedTracks(VotedTracksPayload {
-            payload: msg.tracks
+            payload: msg.tracks,
         });
         self.send_message(response, &msg.connection_id)
     }

@@ -1,0 +1,157 @@
+{
+  "db": "PostgreSQL",
+  "35d96c6ae4f6493b4029bd62edc893094a8b3d96c387a236b6cfe370d96888c9": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                UPDATE sessions \n                SET \n                    current_track_uri = $2\n                WHERE\n                    id = $1\n            "
+  },
+  "5e5017cdfc49964b9123eb94c66f3ed59bd6c84e745c6103b7e165ed9a7103cf": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                UPDATE queued_tracks \n                SET \n                    votes = votes + 1\n                WHERE\n                    track_uri = $1 and session_id = $2\n            "
+  },
+  "7f0f076a89d23fdc12e33bc0578d47e262f963705206a63fa52675de1f8fb66b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                DELETE FROM sessions \n                WHERE id = $1\n            "
+  },
+  "87f2d2473b6e407117a0b04e7a7925ceb12ed0819db08c9a57330f1e9fb2d2e3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "token",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "current_track_uri",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                SELECT token, current_track_uri FROM sessions where id = $1\n            "
+  },
+  "8ed994eada0f91a9af7dfdb2ebeca492546b259b8effbcabab31e7ad60c3a6e0": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO queued_tracks\n                    (track_uri, session_id)\n                VALUES ($1, $2)\n                ON CONFLICT (track_uri, session_id) DO NOTHING\n            "
+  },
+  "9e1c24bd52a2ff68846b13a3aa35300b2cf0eda9fbb642611a04f96707aadf87": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                DELETE FROM queued_tracks \n                WHERE session_id = $1\n            "
+  },
+  "c690e3da9cb561ad0156dd31a353594357546c4dda756a32572e0f3e034b7498": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO sessions (\n                    id, token, created_at\n                )\n                VALUES ($1, $2, now())\n            "
+  },
+  "d0d14efe893fc6c7d86db9ff52622558fbd014193419eaa29357567525f630a6": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n            DELETE FROM votes \n            WHERE track_uri = $1 and session_id = $2\n            "
+  },
+  "e707fb3745991ce5d8b2d95bac2fb7a4d34c64875dd28a1c789a454f6018fe0b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            UPDATE sessions\n            SET\n                token = $2\n            WHERE id = $1\n            "
+  },
+  "e919c56dfc5525289680143310414c46d736230b9fac33bc676c1ee6162fd788": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO votes\n                    (client_id, session_id, track_uri)\n                VALUES ($1, $2, $3)\n            "
+  },
+  "f4ded830a0f08343b46ba1853d1f21b3fc73204152a4652493d49790942321a7": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n                DELETE FROM votes \n                WHERE session_id = $1\n            "
+  }
+}

@@ -1,10 +1,8 @@
-
-
 ROOT=$(shell git rev-parse --show-toplevel)
 OUTPUT_DIR=${ROOT}/build
 TEMPLATE_DIR=${OUTPUT_DIR}/templates
 
-.PHONY: all clean init build client run server
+.PHONY: all clean init build client run server docker
 
 all: clean init build
 
@@ -16,7 +14,8 @@ clean:
 
 init:
 	@echo "Clean build directories"
-	mkdir -p "${TEMPLATE_DIR}"
+	mkdir -p "${TEMPLATE_DIR}"; \
+	cd server; cargo sqlx prepare -- --lib
 
 build: client server
 
@@ -29,8 +28,8 @@ client:
 server:
 	@echo "Build server"
 	cd ${ROOT}/server; \
-	cargo build; \
-	cp target/debug/server ${OUTPUT_DIR}; \
+	cargo build --release; \
+	cp target/release/queuetify ${OUTPUT_DIR}; \
 	cp -r templates ${OUTPUT_DIR}; \
 	cp -r configuration ${OUTPUT_DIR}; \
 	cp .env* ${OUTPUT_DIR}
@@ -42,7 +41,13 @@ redis:
 	./scripts/init_redis.sh
 
 run:
-	cd build; ./server
+	cd build; ./queuetify
 
-serve: postgres redis
-	cd build; ./server
+serve: docker
+	docker-compose up
+
+down:
+	docker-compose down
+
+docker:
+	docker build --tag queuetify -f Dockerfile .

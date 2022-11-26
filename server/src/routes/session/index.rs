@@ -3,9 +3,7 @@ use crate::templates::TEMPLATES;
 use actix_web::HttpResponse;
 use tera::Context as RenderContext;
 
-pub async fn session_index(
-    typed_session: TypedSession
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn session_index(typed_session: TypedSession) -> Result<HttpResponse, actix_web::Error> {
     // TODO: Ok to assume id exists here because of protected route?
     let id = typed_session.get_id().unwrap().unwrap();
     let mut render_context = RenderContext::new();

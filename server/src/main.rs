@@ -1,7 +1,7 @@
 use env_logger::Env;
-use server::application::Application;
-use server::configuration::get_configuration;
-use server::session_agent::SessionAgent;
+use queuetify::application::Application;
+use queuetify::configuration::get_configuration;
+use queuetify::session_agent::SessionAgent;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
 
     // TODO: handle agent run exit and thread join
     tokio::select! {
-        o = application_task => {log::info!("Application task");},
-        o = agent_task =>  { log::info!("Application task"); }
+        _ = application_task => {log::info!("Application task");},
+        _ = agent_task =>  { log::info!("Application task"); }
     };
 
     Ok(())

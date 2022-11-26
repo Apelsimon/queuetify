@@ -2,20 +2,19 @@ use std::str::FromStr;
 
 use crate::configuration::{DatabaseSettings, SpotifySettings};
 use crate::controller::Vote;
+use crate::spotify::{create_token_from_string, get_default_spotify, get_token_string};
 use rspotify::model::TrackId;
+use rspotify::AuthCodeSpotify;
 use secrecy::ExposeSecret;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::PgPool;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
-use rspotify::AuthCodeSpotify;
-use crate::spotify::{get_default_spotify, get_token_string, create_token_from_string};
-use rspotify::Token;
 
 #[derive(Clone)]
 pub struct Database {
     pool: PgPool,
-    spotify_settings: SpotifySettings
+    spotify_settings: SpotifySettings,
 }
 
 pub struct Session {
@@ -33,7 +32,7 @@ impl Database {
     pub fn new(settings: &DatabaseSettings, spotify_settings: SpotifySettings) -> Self {
         Self {
             pool: get_connection_pool(settings),
-            spotify_settings
+            spotify_settings,
         }
     }
 
@@ -206,7 +205,7 @@ impl Database {
         &self,
         id: Uuid,
         transaction: &mut Transaction<'static, Postgres>,
-    ) -> Result<Option<TrackId>, sqlx::Error> {        
+    ) -> Result<Option<TrackId>, sqlx::Error> {
         let result: Option<(String,)> = sqlx::query_as(
             r#"
                 DELETE FROM queued_tracks 
@@ -290,7 +289,7 @@ impl Database {
                     votes = votes + 1
                 WHERE
                     track_uri = $1 and session_id = $2
-            "#,            
+            "#,
             msg.track_id.to_string(),
             msg.session_id,
         )
@@ -301,13 +300,17 @@ impl Database {
         Ok(())
     }
 
-    pub async fn remove_votes(&self, transaction: &mut Transaction<'static, Postgres>,
-    id: Uuid, track_id: TrackId) -> Result<(), sqlx::Error> {
+    pub async fn remove_votes(
+        &self,
+        transaction: &mut Transaction<'static, Postgres>,
+        id: Uuid,
+        track_id: TrackId,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
             DELETE FROM votes 
             WHERE track_uri = $1 and session_id = $2
-            "#,            
+            "#,
             track_id.to_string(),
             id
         )
@@ -316,7 +319,11 @@ impl Database {
         Ok(())
     }
 
-    pub async fn set_spotify(&self, id: Uuid, spotify: &AuthCodeSpotify) -> Result<(), anyhow::Error> {
+    pub async fn set_spotify(
+        &self,
+        id: Uuid,
+        spotify: &AuthCodeSpotify,
+    ) -> Result<(), anyhow::Error> {
         let token = get_token_string(&spotify).await?;
         sqlx::query!(
             r#"
@@ -330,13 +337,11 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        
+
         Ok(())
     }
 
-    pub async fn get_spotify(&self,
-        id: Uuid,
-    ) -> Result<AuthCodeSpotify, anyhow::Error> {
+    pub async fn get_spotify(&self, id: Uuid) -> Result<AuthCodeSpotify, anyhow::Error> {
         let session = self.get_session(id).await?;
         let spotify = get_default_spotify(&self.spotify_settings);
         let token = create_token_from_string(&session.token)?;
@@ -344,7 +349,11 @@ impl Database {
         Ok(spotify)
     }
 
-    pub async fn voted_tracks(&self, id: Uuid, client_id: Uuid) -> Result<Vec<String>, sqlx::Error> {
+    pub async fn voted_tracks(
+        &self,
+        id: Uuid,
+        client_id: Uuid,
+    ) -> Result<Vec<String>, sqlx::Error> {
         let uris: Vec<(String,)> = sqlx::query_as(
             r#"
                     SELECT track_uri FROM votes where session_id = $1 and client_id = $2
@@ -373,6 +382,6 @@ fn get_connection_pool(settings: &DatabaseSettings) -> PgPool {
         .port(settings.port);
 
     PgPoolOptions::new()
-        // .acquire_timeout(std::time::Duration::from_secs(2)) //TODO: enable
+        .acquire_timeout(std::time::Duration::from_secs(2))
         .connect_lazy_with(options)
 }

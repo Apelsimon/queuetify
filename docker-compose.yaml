@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  app:
+    image: "queuetify:latest"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes: 
+      - ./migrations/.:/docker-entrypoint-initdb.d/.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: queuetify
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    command:
+      - -N 1000
+  redis:
+    image: redis

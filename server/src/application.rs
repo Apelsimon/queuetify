@@ -2,7 +2,7 @@ use crate::configuration::Settings;
 use crate::controller::Controller;
 use crate::db::Database;
 use crate::middleware::reject_anonymous_users;
-use crate::routes::{callback, create_session, index, logout, join, session_index, ws_connect};
+use crate::routes::{callback, create_session, index, join, logout, session_index, ws_connect};
 use crate::session_agent::SessionAgentRequest;
 use actix::Actor;
 use actix_files as fs;
@@ -47,7 +47,7 @@ impl Application {
                         .wrap(from_fn(reject_anonymous_users))
                         .route("/", web::get().to(session_index))
                         .route("/ws", web::get().to(ws_connect))
-                        .route("/logout", web::get().to(logout))
+                        .route("/logout", web::get().to(logout)),
                 )
                 .service(fs::Files::new("/static", "."))
                 .app_data(db.clone())

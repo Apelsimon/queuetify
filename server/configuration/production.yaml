@@ -1,0 +1,3 @@
+database:
+  host: "postgres"
+redis_uri: "redis://redis:6379"

@@ -1,8 +1,8 @@
 use crate::configuration::Settings;
 use crate::controller;
 use crate::controller::messages::{
-    DevicesComplete, DeviceInfo, KillComplete, SearchComplete, 
-    SearchResultPayload, StateUpdate, StateUpdatePayload, TransferComplete, VotedTracksComplete
+    DeviceInfo, DevicesComplete, KillComplete, SearchComplete, SearchResultPayload, StateUpdate,
+    StateUpdatePayload, TransferComplete, VotedTracksComplete,
 };
 use crate::controller::{Controller, POLL_STATE_INTERVAL, REFRESH_TOKEN_INTERVAL};
 use crate::db::Database;
@@ -32,7 +32,7 @@ pub enum SessionAgentRequest {
     Kill((Uuid, Addr<Controller>)),
     Devices((controller::Devices, Addr<Controller>)),
     Transfer((controller::Transfer, Addr<Controller>)),
-    VotedTracks((controller::VotedTracks, Addr<Controller>))
+    VotedTracks((controller::VotedTracks, Addr<Controller>)),
 }
 
 pub struct SessionAgent {
@@ -68,7 +68,7 @@ impl SessionAgent {
                             connection_id: msg.connection_id,
                         });
                     }
-                },
+                }
                 SessionAgentRequest::Queue((msg, addr)) => {
                     let result = on_queue(msg, &self.db).await;
                     match result {
@@ -79,7 +79,7 @@ impl SessionAgent {
                             log::error!("Error on queue {err}");
                         }
                     }
-                },
+                }
                 SessionAgentRequest::GetState((id, connection_id, addr)) => {
                     let spotify = match self.db.get_spotify(id).await {
                         Ok(spotify) => spotify,
@@ -88,104 +88,86 @@ impl SessionAgent {
                     match get_current_state(id, connection_id, &spotify, &self.db).await {
                         Ok(update) => {
                             addr.do_send(update);
-                        },
+                        }
                         Err(err) => {
                             log::error!("Failed to get current state {err}");
                         }
                     }
-                },
+                }
                 SessionAgentRequest::PollState((id, addr)) => {
                     match on_poll_state(id, &self.db).await {
                         Ok(update) => {
                             if let Some(update) = update {
                                 addr.do_send(update);
                             }
-                        },
+                        }
                         Err(err) => {
                             log::error!("Error on poll state {err}");
                         }
                     }
-                },
-                SessionAgentRequest::Vote((msg, addr)) => {
-                    match on_vote(msg, &self.db).await {
-                        Ok(update) => {
-                            if let Some(update) = update {
-                                addr.do_send(update);
-                            }
-                        },
-                        Err(err) => {
-                            log::error!("Error on vote {err}");
+                }
+                SessionAgentRequest::Vote((msg, addr)) => match on_vote(msg, &self.db).await {
+                    Ok(update) => {
+                        if let Some(update) = update {
+                            addr.do_send(update);
                         }
+                    }
+                    Err(err) => {
+                        log::error!("Error on vote {err}");
                     }
                 },
                 SessionAgentRequest::Refresh((id, addr)) => {
                     match on_refresh(id, &self.db).await {
-                        Ok(()) => {
-                            addr.do_send(controller::Refresh {
-                                duration: REFRESH_TOKEN_INTERVAL,
-                                session_id: id
-                            })
-                        },
+                        Ok(()) => addr.do_send(controller::Refresh {
+                            duration: REFRESH_TOKEN_INTERVAL,
+                            session_id: id,
+                        }),
                         Err(_) => {
                             addr.do_send(controller::Refresh {
                                 duration: Duration::from_secs(10), //TODO: exponential backoff wait? kill session after some number of tries?
-                                session_id: id
+                                session_id: id,
                             })
                         }
                     }
-                },
-                SessionAgentRequest::Kill((id, addr)) => {
-                    match self.db.delete_session(id).await {
-                        Ok(()) => {
-                            addr.do_send(KillComplete {
-                                session_id: id
-                            })
-                        },
-                        Err(err) => {
-                            log::error!("Error on kill {err}");
-                        }
+                }
+                SessionAgentRequest::Kill((id, addr)) => match self.db.delete_session(id).await {
+                    Ok(()) => addr.do_send(KillComplete { session_id: id }),
+                    Err(err) => {
+                        log::error!("Error on kill {err}");
                     }
                 },
                 // TODO: make endpoint of this instead
                 SessionAgentRequest::Devices((msg, addr)) => {
                     let connection_id = msg.connection_id;
                     match on_devices(msg, &self.db).await {
-                        Ok(devices) => {
-                            addr.do_send(DevicesComplete {
-                                connection_id,
-                                devices
-                            })
-                        },
+                        Ok(devices) => addr.do_send(DevicesComplete {
+                            connection_id,
+                            devices,
+                        }),
                         Err(err) => {
                             log::error!("Error on devices {err}")
                         }
                     }
-                },
+                }
                 SessionAgentRequest::Transfer((msg, addr)) => {
                     let connection_id = msg.connection_id;
                     match on_transfer(msg, &self.db).await {
-                        Ok(()) => {
-                            addr.do_send(TransferComplete {
-                                connection_id,
-                                result: "OK".to_string()
-                            })
-                        },
-                        Err(_) => {
-                            addr.do_send(TransferComplete {
-                                connection_id,
-                                result: "Err".to_string()
-                            })
-                        }
+                        Ok(()) => addr.do_send(TransferComplete {
+                            connection_id,
+                            result: "OK".to_string(),
+                        }),
+                        Err(_) => addr.do_send(TransferComplete {
+                            connection_id,
+                            result: "Err".to_string(),
+                        }),
                     }
-                },
+                }
                 SessionAgentRequest::VotedTracks((msg, addr)) => {
                     match on_voted_tracks(msg.clone(), &self.db).await {
-                        Ok(tracks) => {
-                            addr.do_send(VotedTracksComplete {
-                                connection_id: msg.connection_id,
-                                tracks
-                            })
-                        },
+                        Ok(tracks) => addr.do_send(VotedTracksComplete {
+                            connection_id: msg.connection_id,
+                            tracks,
+                        }),
                         Err(err) => {
                             log::error!("Error on devices {err}");
                         }
@@ -283,12 +265,7 @@ async fn on_search(msg: &controller::Search, db: &Database) -> Result<SearchResu
 async fn start_playback(spotify: &AuthCodeSpotify, id: TrackId) -> Result<(), anyhow::Error> {
     let uri: Box<dyn PlayableId> = Box::new(id);
     spotify
-        .start_uris_playback(
-            Some(uri.as_ref()),
-            None,
-            None,
-            None,
-        )
+        .start_uris_playback(Some(uri.as_ref()), None, None, None)
         .await?;
     Ok(())
 }
@@ -316,7 +293,6 @@ async fn get_current_state(
     if !state.current_queue.is_empty() {
         let tracks = state.current_queue.iter().collect::<Vec<_>>();
         let queue = spotify.tracks(tracks, None).await?;
-        
 
         for track in queue.iter() {
             match TrackInfo::try_from(track.clone()) {
@@ -326,7 +302,7 @@ async fn get_current_state(
                 Err(_) => {}
             }
         }
-    }    
+    }
 
     let payload = State {
         track: current_track,
@@ -335,7 +311,7 @@ async fn get_current_state(
     Ok(StateUpdate {
         update: StateUpdatePayload { payload },
         session_id: id,
-        connection_id
+        connection_id,
     })
 }
 
@@ -384,7 +360,12 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                                     .await?
                                                 {
                                                     Some(new_track) => {
-                                                        db.remove_votes(&mut transaction, id, new_track.clone()).await?;
+                                                        db.remove_votes(
+                                                            &mut transaction,
+                                                            id,
+                                                            new_track.clone(),
+                                                        )
+                                                        .await?;
                                                         db.set_current_track(
                                                             transaction,
                                                             id,
@@ -401,7 +382,9 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
                                                     }
                                                 }
 
-                                                let state = get_current_state(id, None, &spotify, &db).await?;
+                                                let state =
+                                                    get_current_state(id, None, &spotify, &db)
+                                                        .await?;
                                                 return Ok(Some(state));
                                             }
                                         }
@@ -443,16 +426,17 @@ async fn on_poll_state(id: Uuid, db: &Database) -> Result<Option<StateUpdate>, a
     Ok(None)
 }
 
-async fn on_vote(msg: controller::Vote, db: &Database) -> Result<Option<StateUpdate>, anyhow::Error> {
+async fn on_vote(
+    msg: controller::Vote,
+    db: &Database,
+) -> Result<Option<StateUpdate>, anyhow::Error> {
     match db.add_vote(&msg).await {
         Ok(()) => {
             let spotify = db.get_spotify(msg.session_id).await?;
             let state = get_current_state(msg.session_id, None, &spotify, &db).await?;
             Ok(Some(state))
-        },
-        Err(_) => {
-            Ok(None)
         }
+        Err(_) => Ok(None),
     }
 }
 
@@ -463,7 +447,10 @@ async fn on_refresh(id: Uuid, db: &Database) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn on_devices(msg: controller::Devices, db: &Database) -> Result<Vec<DeviceInfo>, anyhow::Error> {
+async fn on_devices(
+    msg: controller::Devices,
+    db: &Database,
+) -> Result<Vec<DeviceInfo>, anyhow::Error> {
     let spotify = db.get_spotify(msg.session_id).await?;
     let devices = spotify.device().await?;
 
@@ -483,11 +470,16 @@ async fn on_devices(msg: controller::Devices, db: &Database) -> Result<Vec<Devic
 
 async fn on_transfer(msg: controller::Transfer, db: &Database) -> Result<(), anyhow::Error> {
     let spotify = db.get_spotify(msg.session_id).await?;
-    spotify.transfer_playback(&msg.device_id, Some(false)).await?;
+    spotify
+        .transfer_playback(&msg.device_id, Some(false))
+        .await?;
     Ok(())
 }
 
-async fn on_voted_tracks(msg: controller::VotedTracks, db: &Database) -> Result<Vec<String>, anyhow::Error> {
+async fn on_voted_tracks(
+    msg: controller::VotedTracks,
+    db: &Database,
+) -> Result<Vec<String>, anyhow::Error> {
     let voted_tracks = db.voted_tracks(msg.session_id, msg.connection_id).await?;
     Ok(voted_tracks)
 }
