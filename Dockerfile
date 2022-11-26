@@ -27,6 +27,7 @@ RUN cargo build --release
 
 ### Start runtime ###
 FROM debian:bullseye-slim AS runtime
+ARG ENVIRONMENT=local
 
 WORKDIR /app
 
@@ -46,6 +47,6 @@ COPY --from=server-builder /app/.env.secret .
 COPY --from=server-builder /app/configuration configuration
 COPY --from=server-builder /app/templates templates
 
-ENV APP_ENVIRONMENT production
+ENV APP_ENVIRONMENT ${ENVIRONMENT}
 
 ENTRYPOINT ["./queuetify"]
