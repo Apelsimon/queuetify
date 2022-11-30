@@ -10,6 +10,7 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::PgPool;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
+use sqlx::postgres::PgSslMode;
 
 #[derive(Clone)]
 pub struct Database {
@@ -374,12 +375,19 @@ impl Database {
 }
 
 fn get_connection_pool(settings: &DatabaseSettings) -> PgPool {
+    let ssl_mode = if settings.require_ssl {
+        PgSslMode:: Require
+    } else {
+        // Try an encrypted connection, fallback to unencrypted if it fails
+        PgSslMode:: Prefer
+    };
     let options = PgConnectOptions::new()
         .host(&settings.host)
         .username(&settings.username)
         .password(&settings.password.expose_secret())
         .database(&settings.database_name)
-        .port(settings.port);
+        .port(settings.port)
+        .ssl_mode(ssl_mode);
 
     PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(2))

@@ -3,6 +3,9 @@ application:
   hmac_secret: "super-long-and-secret-random-key-needed-to-verify-message-integrity"
 database:
   port: 5432
+  host: "postgres"
   username: "postgres"
   password: "password"
   database_name: "queuetify"
+  require_ssl: false
+redis_uri: "redis://redis:6379"
