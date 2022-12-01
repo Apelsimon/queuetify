@@ -41,7 +41,7 @@ RUN apt-get update -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=client-builder /app/dist/. .
+COPY --from=client-builder /app/public/. .
 COPY --from=server-builder /app/target/release/queuetify queuetify
 COPY --from=server-builder /app/.env.secret .
 COPY --from=server-builder /app/configuration configuration

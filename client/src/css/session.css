@@ -1,33 +1,48 @@
+
 #settings-nav {
     @apply h-full w-0 fixed z-10 
-    top-0 right-0 overflow-x-hidden ease-in duration-500 bg-slate-100
+    top-0 right-0 overflow-x-hidden ease-in duration-500 bg-pink-500
 }
 
 #settings-nav-content {
     @apply flex flex-col space-y-2 p-1
 }
 
-#close-settings-nav-btn {
-    width: 15%;
+#close-settings-nav-btn-container {
+    @apply flex justify-end p-1 space-x-1
+}
 
-    @apply self-end
+#close-settings-nav-btn {
+    @apply px-5
+}
+
+#close-settings-nav-btn:hover {
+    @apply bg-pink-400
 }
 
 #search-nav {
     @apply flex flex-col space-y-1 h-0 w-full fixed z-10 
-    top-0 right-0 overflow-x-hidden ease-in duration-500 bg-slate-100
+    top-0 right-0 overflow-hidden ease-in duration-500 bg-pink-500
 }
 
 #search-ctl {
-    @apply flex flex-row space-x-1 p-1
+    @apply flex justify-between space-x-1 p-1;
 }
 
 #search-input {
-    @apply grow rounded
+    @apply grow min-w-0;
+}
+
+#search-btn:hover {
+    @apply bg-pink-400;
+}
+
+#close-search-nav-btn:hover {
+    @apply bg-pink-400;
 }
 
 .track-container {
-    @apply flex flex-row justify-between p-1
+    @apply flex flex-row justify-between p-1 items-center
 }
 
 #track-queue {
@@ -48,24 +63,43 @@
 
 #devices-nav {
     @apply h-full w-0 fixed z-10 
-    top-0 left-0 overflow-x-hidden ease-in duration-500 bg-slate-100
+    top-0 left-0 overflow-x-hidden ease-in duration-500 bg-pink-500
     flex flex-col space-y-2
 }
 
+#device-list {
+    @apply p-1 space-y-1
+}
+
 .device {
-    @apply flex flex-row space-x-1 p-4 justify-between
+    @apply flex flex-row p-1 justify-between items-center
 }
 
 #end-session-btn {
-    @apply bg-red-600 text-white
+    @apply bg-red-600 text-amber-50
+}
+
+#end-session-btn:hover {
+    @apply bg-red-400 text-amber-50
+}
+
+#close-devices-nav-btn-container {
+    @apply flex justify-end p-1
 }
 
 #close-devices-nav-btn {
-    width: 15%;
+    @apply px-5
+}
 
-    @apply self-end m-1
+#close-devices-nav-btn:hover {
+    @apply bg-pink-400
 }
 
 .voted-btn {
-    @apply bg-green-400
+    @apply bg-pink-700
+}
+
+/* TODO: apply to all nav buttons */
+.nav-btn:hover {
+    @apply bg-pink-400;
 }

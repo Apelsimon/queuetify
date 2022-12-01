@@ -76,7 +76,9 @@ const onMessageCb = (ev: MessageEvent<any>) => {
                 let currentTrackContainer = document.createElement("div")
                 currentTrackContainer.id = "current-track-container"
                 let paragraph = document.createElement("p")
-                paragraph.textContent = stateUpdate.track.name + " - " + stateUpdate.track.artists
+                const b = document.createElement("b")
+                b.textContent = stateUpdate.track.name + " - " + stateUpdate.track.artists
+                paragraph.appendChild(b)
                 currentTrackContainer.appendChild(paragraph)
 
                 let volumeIcon = document.createElement("i")
@@ -133,6 +135,11 @@ doConnect(onOpenCb)
 const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
 const settingsNavContent = document.querySelector<HTMLDivElement>("#settings-nav-content")
 const devicesNav = document.querySelector<HTMLDivElement>("#devices-nav")
+const closeDevicesNavButton = document.querySelector<HTMLButtonElement>("#close-devices-nav-btn")
+    closeDevicesNavButton.addEventListener("click", (ev) => {
+        devicesNav.style.width = "0"
+})
+
 
 const closeSettingsNavButton = document.querySelector<HTMLButtonElement>("#close-settings-nav-btn")
 closeSettingsNavButton.addEventListener("click", (ev) => {
@@ -152,6 +159,7 @@ if (context === Context.Host) {
         
         navigator.clipboard.writeText(url)
     })
+    copyJoinUrlButton.classList.add("nav-btn")
     settingsNavContent.appendChild(copyJoinUrlButton)
 
     const devicesButton = document.createElement("button")
@@ -162,6 +170,7 @@ if (context === Context.Host) {
         doSend(JSON.stringify(devicesRequest))
         settingsNav.style.width = "0"
     })
+    devicesButton.classList.add("nav-btn")
     settingsNavContent.appendChild(devicesButton)
 
     const endSessionButton = document.createElement("button")
@@ -200,7 +209,7 @@ const voteTrack = (ev: MouseEvent, trackId: string) => {
 const createTrackListEntry = (info: TrackInfo, buttonText: string, onClickCb: (ev: MouseEvent, trackId: string) => void) => {
 
     var listEntry = document.createElement("li")
-    listEntry.className = "track-container"
+    listEntry.classList.add("track-container")
     
     var paragraph = document.createElement("p")
     paragraph.textContent = info.name + " - " + info.artists
@@ -217,6 +226,11 @@ const createTrackListEntry = (info: TrackInfo, buttonText: string, onClickCb: (e
     button.innerText = buttonText
     button.addEventListener("click", swap.bind(callback, info.id))
     button.id = info.id
+
+    if (buttonText === "Add") {
+        button.classList.add("nav-btn"); //TODO: ugly..
+    }
+
 
     if (votedTracksCache.includes(info.id)) {
         button.className = "voted-btn"
@@ -276,25 +290,14 @@ settingsToggle.addEventListener("click", (ev) => {
 })
 
 const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
-    devicesNav.innerText = ""
-    
-    const closeDevicesNavButton = document.createElement("button")
-    closeDevicesNavButton.id = "close-devices-nav-btn"
-    closeDevicesNavButton.addEventListener("click", (ev) => {
-        devicesNav.style.width = "0"
-    })
-
-    const closeIcon = document.createElement("i")
-    closeIcon.classList.add("fa")
-    closeIcon.classList.add("fa-times")
-    closeIcon.ariaHidden = "true"
-    closeDevicesNavButton.appendChild(closeIcon)
-
-    devicesNav.appendChild(closeDevicesNavButton)
+    const deviceList = document.querySelector<HTMLDivElement>("#device-list")
+    deviceList.innerText = ""
 
     let p = document.createElement("p")
-    p.innerText = "Select playback device"
-    devicesNav.appendChild(p)
+    let b = document.createElement("b")
+    b.innerText = "Select playback device"
+    p.appendChild(b)
+    deviceList.appendChild(p)
 
     for (const device of devices) {
         let container = document.createElement("div")
@@ -316,10 +319,11 @@ const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
         }
         
         button.addEventListener("click", swap.bind(callback, device.id))
+        button.classList.add("nav-btn")
 
         container.appendChild(p)
         container.appendChild(button)
-        devicesNav.appendChild(container)
+        deviceList.appendChild(container)
     }
 
     devicesNav.style.width = "100%"

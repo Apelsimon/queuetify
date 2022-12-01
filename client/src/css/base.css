@@ -3,17 +3,25 @@
 @tailwind utilities;
 
 body {
-    @apply bg-slate-50 text-gray-700
+    @apply bg-pink-400 text-yellow-50
 }
 
 button {
-    @apply font-bold py-2 px-4 rounded text-gray-500 border-2;
+    @apply font-bold py-2 px-4 rounded text-amber-50 border-2 border-amber-50;
 }
 
 button:hover {
-    @apply bg-gray-200;
+    @apply bg-pink-500;
 }
 
 h1 {
-    @apply text-gray-500
+    @apply text-amber-50;
+}
+
+p {
+    @apply text-amber-50;
+}
+
+input {
+    @apply text-slate-600;
 }
