@@ -128,9 +128,15 @@ const onOpenCb = () => {
 
     const stateRequest = { type: "State" }
     doSend(JSON.stringify(stateRequest))
+
+    document.querySelector<HTMLDivElement>("#connection-down-modal").style.width = "0";
 }
 
-doConnect(onOpenCb)
+const onCloseCb = () => {
+    document.querySelector<HTMLDivElement>("#connection-down-modal").style.width = "100%";
+}
+
+doConnect(onOpenCb, onCloseCb)
 
 const settingsNav = document.querySelector<HTMLDivElement>("#settings-nav")
 const settingsNavContent = document.querySelector<HTMLDivElement>("#settings-nav-content")

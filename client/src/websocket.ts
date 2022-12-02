@@ -1,8 +1,12 @@
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
+type OnMessageCallback = (ev: MessageEvent<any>) => any;
+type OnOpenCallback = () => void;
+type OnCloseCallback = () => void;
+
 let socket: ReconnectingWebSocket = null;
 
-const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => void) =>  {
+const connect = (onMessageCb: OnMessageCallback, onOpenCb: OnOpenCallback, onCloseCb: OnCloseCallback) =>  {
     doDisconnect()
 
     const { location } = window
@@ -22,6 +26,7 @@ const connect = (onMessageCb: (ev: MessageEvent<any>) => any, onOpenCb: () => vo
 
     socket.onclose = () => {
       console.log('Disconnected')
+      onCloseCb()
     }
 }
 
@@ -39,7 +44,7 @@ const doSend = (msg: string) => {
     }
 }
 
-const useWebSocket = (onMessageCb: (ev: MessageEvent<any>) => any) => {
+const useWebSocket = (onMessageCb: OnMessageCallback) => {
   const doConnect = connect.bind(null, onMessageCb)
   return { doConnect, doDisconnect, doSend }
 }
