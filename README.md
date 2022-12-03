@@ -27,3 +27,6 @@ make down
 ```
 
 > **_Note:_** All new Spotify third-party applications begin in Development Mode. Users of the app then needs to be managed, see: https://developer.spotify.com/community/news/2021/05/27/improving-the-developer-and-user-experience-for-third-party-apps/
+
+## Example
+![alt text](https://github.com/Apelsimon/queuetify/blob/main/example/queuetify.gif "Queuetify app example")
