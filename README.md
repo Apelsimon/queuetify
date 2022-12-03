@@ -1,6 +1,6 @@
 # Queuetify
 
-Create a session where multiple users can queue and vote for songs
+Create a Spotify session where multiple users can queue and vote for songs
 
 ## Local deployment
 Follow these instructions to register the application, which will provide you with a
@@ -25,3 +25,5 @@ To tear down deployment, run:
 ```
 make down
 ```
+
+> **_Note:_** All new Spotify third-party applications begin in Development Mode. Users of the app then needs to be managed, see: https://developer.spotify.com/community/news/2021/05/27/improving-the-developer-and-user-experience-for-third-party-apps/
