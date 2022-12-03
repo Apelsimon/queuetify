@@ -3,6 +3,7 @@
 Create a Spotify session where multiple users can queue and vote for songs
 
 ## Local deployment
+
 Follow these instructions to register the application, which will provide you with a
 *Client ID* and *Client Secret*: https://developer.spotify.com/documentation/web-api/quick-start/
 
@@ -30,5 +31,10 @@ make down
 
 > **_Note:_** All new Spotify third-party applications begin in Development Mode. Users of the app then needs to be managed, see: https://developer.spotify.com/community/news/2021/05/27/improving-the-developer-and-user-experience-for-third-party-apps/
 
+## Credit
+
+Much of this project is based on Luca Palmieri's [Zero To Production In Rust](https://www.zero2prod.com/index.html) which I highly recommend
+
 ## Example
+
 ![alt text](https://github.com/Apelsimon/queuetify/blob/main/example/queuetify.gif "Queuetify app example")
