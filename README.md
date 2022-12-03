@@ -4,7 +4,9 @@ Create a Spotify session where multiple users can queue and vote for songs
 
 ## Local deployment
 Follow these instructions to register the application, which will provide you with a
-*Client ID* and *Client Secret*. You also need to add the following redirect URI in
+*Client ID* and *Client Secret*: https://developer.spotify.com/documentation/web-api/quick-start/
+
+You also need to add the following redirect URI in
 your application settings: *http://localhost:8080/callback*
 
 Add a file named *.env.secret* in the server directory and add the following variables
