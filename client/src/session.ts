@@ -161,7 +161,6 @@ if (context === Context.Host) {
         const sessionId = document.querySelector<HTMLButtonElement>("#session_id")
         const { location } = window
         const url = `${location.protocol}//${location.host}/join/${sessionId.innerText}`
-        console.log("Copy join url ", url)
         
         navigator.clipboard.writeText(url)
     })
@@ -200,14 +199,12 @@ if (context === Context.Host) {
 }
 
 const queueTrack = (ev: MouseEvent, trackId: string) => {
-    console.log("Queue track ", trackId)
     const queueRequest = { type: "Queue", uri: trackId }
     doSend(JSON.stringify(queueRequest))
     closeSearchNavButton.click()
 }
 
 const voteTrack = (ev: MouseEvent, trackId: string) => {
-    console.log("Vote for track ", trackId)
     const voteRequets = { type: "Vote", uri: trackId }
     doSend(JSON.stringify(voteRequets))
 }
@@ -316,7 +313,6 @@ const populateAndDisplayDevicesNav = (devices: DeviceInfo[]) => {
 
         const callback = (ev: MouseEvent, deviceId: string) => {
             ev.preventDefault()
-            console.log("Transfer to device with id ", deviceId)
             const transferRequest = { type: "Transfer", device_id: deviceId }
             doSend(JSON.stringify(transferRequest))
         }

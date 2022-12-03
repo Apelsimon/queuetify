@@ -10,6 +10,5 @@ createSessionButton.addEventListener("click", async (ev) => {
         let result = await axios.get("/create"); 
         window.location.href = result.data;
     } catch (error) {
-        console.log("Error on create endpoint: ", error);
     }
 })

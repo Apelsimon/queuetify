@@ -14,25 +14,21 @@ const connect = (onMessageCb: OnMessageCallback, onOpenCb: OnOpenCallback, onClo
     const proto = location.protocol.startsWith('https') ? 'wss' : 'ws'
     const wsUri = `${proto}://${location.host}/session/ws`
 
-    console.log('Connecting...')
     socket = new ReconnectingWebSocket(wsUri)
 
     socket.onopen = () => {
-      console.log('Connected')
       onOpenCb()
     }
 
     socket.onmessage = onMessageCb
 
     socket.onclose = () => {
-      console.log('Disconnected')
       onCloseCb()
     }
 }
 
 const doDisconnect = () => {
     if (socket) {
-      console.log('Disconnecting...')
       socket.close()
       socket = null
     }
