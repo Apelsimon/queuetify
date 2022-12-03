@@ -1,13 +1,7 @@
 
-.PHONY: default docker down postgres redis serve
+.PHONY: default docker down serve
 
 default: docker
-
-postgres:
-	./scripts/init_db.sh
-
-redis:
-	./scripts/init_redis.sh
 
 docker:
 	docker build --tag queuetify -f Dockerfile .
